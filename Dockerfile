@@ -1,5 +1,5 @@
 # Builder
-FROM golang:1.18.0-alpine AS builder
+FROM golang:1.18.0 AS builder
 WORKDIR /builder
 COPY go.mod ./
 COPY go.sum ./
