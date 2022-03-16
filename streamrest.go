@@ -148,7 +148,6 @@ func main() {
 	tcliConfs := torrent.NewDefaultClientConfig()
 
 	// Set the download directory to streamrest directory
-	fmt.Println(filepath.Join(".", "streamrest", "downloads"))
 	tcliConfs.DataDir = filepath.Join(".", "streamrest", "downloads")
 
 	// Make the torrent client
