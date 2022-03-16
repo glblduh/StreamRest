@@ -139,6 +139,71 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&rtBodyRes)
 }
 
+type listTorrentsRes struct {
+	Torrents []string
+}
+
+func listTorrents(w http.ResponseWriter, r *http.Request) {
+	// Var for JSON response
+	var ltRes listTorrentsRes
+
+	// Get infohash of all of the torrents
+	allTorrents := torrentCli.Torrents()
+	for i := 0; i < len(allTorrents); i++ {
+		ltRes.Torrents = append(ltRes.Torrents, allTorrents[i].InfoHash().String())
+	}
+
+	//Send response
+	json.NewEncoder(w).Encode(&ltRes)
+}
+
+type torrentStatsBody struct {
+	InfoHash string
+}
+
+type torrentStatsRes struct {
+	InfoHash      string
+	Name          string
+	isSeeding     bool
+	TotalPeers    int
+	ActivePeers   int
+	PendingPeers  int
+	HalfOpenPeers int
+}
+
+func torrentStats(w http.ResponseWriter, r *http.Request) {
+	// Vars for request body and response
+	var tsBody torrentStatsBody
+	var tsRes torrentStatsRes
+	var eRes errorRes
+
+	// Decodes request body to JSON
+	json.NewDecoder(r.Body).Decode(&tsBody)
+	if tsBody.InfoHash == "" {
+		eRes.Error = "InfoHash is not provided"
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Get info from torrent selected
+	allTorrents := torrentCli.Torrents()
+	for i := 0; i < len(allTorrents); i++ {
+		if allTorrents[i].InfoHash().String() == tsBody.InfoHash {
+			tsRes.InfoHash = allTorrents[i].InfoHash().String()
+			tsRes.Name = allTorrents[i].Name()
+			tsRes.isSeeding = allTorrents[i].Seeding()
+			tsRes.TotalPeers = allTorrents[i].Stats().TotalPeers
+			tsRes.ActivePeers = allTorrents[i].Stats().ActivePeers
+			tsRes.HalfOpenPeers = allTorrents[i].Stats().HalfOpenPeers
+			tsRes.PendingPeers = allTorrents[i].Stats().PendingPeers
+			break
+		}
+	}
+
+	// Send response
+	json.NewEncoder(w).Encode(&tsRes)
+}
+
 func main() {
 	// Make streamrest directory if doesn't exist
 	os.MkdirAll(filepath.Join(".", "streamrest"), os.ModePerm)
@@ -157,6 +222,8 @@ func main() {
 	http.HandleFunc("/api/addmagnet", addMagnet)
 	http.HandleFunc("/api/stream", beginFileDownload)
 	http.HandleFunc("/api/removetorrent", removeTorrent)
+	http.HandleFunc("/api/torrents", listTorrents)
+	http.HandleFunc("/api/torrent", torrentStats)
 
 	// Listen to port 1010
 	fmt.Printf("StreamRest is listening at http://0.0.0.0:1010\n")

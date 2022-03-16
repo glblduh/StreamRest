@@ -31,3 +31,14 @@ The keys are `infohash` and `filename`.
     InfoHash: "infohash"
 }
 ```
+
+### List all torrents
+`/api/torrents`
+
+### Get Torrent info
+`/api/torrent`
+```
+{
+    InfoHash: "infohash"
+}
+```
