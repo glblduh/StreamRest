@@ -8,7 +8,6 @@ RUN go mod download
 COPY streamrest.go ./
 ARG TARGETOS
 ARG TARGETARCH
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o /builder/streamrest;
 RUN if [ "$TARGETARCH" = "amd64" ]; then\
     CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o /builder/streamrest;\
 elif [ "$TARGETARCH" = "arm64" ]; then\
