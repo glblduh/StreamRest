@@ -215,6 +215,13 @@ func main() {
 	// Set the download directory to streamrest directory
 	tcliConfs.DataDir = filepath.Join(".", "streamrest", "downloads")
 
+	// Check for NOUPLOAD env key to disable upload
+	_, existEnvNoUpload := os.LookupEnv("NOUPLOAD")
+	if existEnvNoUpload {
+		fmt.Println("[INFO] Upload is disabled")
+		tcliConfs.NoUpload = existEnvNoUpload
+	}
+
 	// Make the torrent client
 	torrentCli, _ = torrent.NewClient(tcliConfs)
 
@@ -225,7 +232,12 @@ func main() {
 	http.HandleFunc("/api/torrents", listTorrents)
 	http.HandleFunc("/api/torrent", torrentStats)
 
-	// Listen to port 1010
-	fmt.Printf("StreamRest is listening at http://0.0.0.0:1010\n")
-	http.ListenAndServe(":1010", nil)
+	// Start listening
+	httpHost := ":1010"
+	envHost, existEnvHost := os.LookupEnv("HOST")
+	if existEnvHost {
+		httpHost = envHost
+	}
+	fmt.Printf("[INFO] Listening on http://%s\n", httpHost)
+	http.ListenAndServe(httpHost, nil)
 }
