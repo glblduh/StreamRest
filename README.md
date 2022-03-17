@@ -7,6 +7,9 @@ go mod download
 go build streamrest.go
 ```
 
+## Starting
+`streamrest [-l PORT] [-d DOWNLOADDIR] [--noup]`
+
 ## Endpoints
 The default HTTP port is `1010`
 
