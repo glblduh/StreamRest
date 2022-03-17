@@ -94,6 +94,7 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 					fileRead.SetReadahead(torrentFiles[j].Length() / 100)
 					fileRead.SetResponsive()
 					fileRead.Seek(torrentFiles[j].Offset(), io.SeekStart)
+					w.Header().Set("Content-Disposition", "attachment; filename=\""+torrentFiles[j].DisplayPath()+"\"")
 					http.ServeContent(w, r, torrentFiles[j].DisplayPath(), time.Now(), fileRead)
 					break
 				}
@@ -154,6 +155,7 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Send response
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(&ltRes)
 }
 
@@ -201,6 +203,7 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send response
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(&tsRes)
 }
 

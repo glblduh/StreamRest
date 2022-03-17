@@ -1,6 +1,14 @@
 # StreamRest
 *Torrent streaming server controlled by REST API's*
 
+## Docker
+```
+docker run -d \
+--name streamrest \
+-p 1010:1010 \
+glbl/streamrest:latest
+```
+
 ## Compiling
 ```
 go mod download
