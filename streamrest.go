@@ -210,6 +210,12 @@ func main() {
 	dataDir := ""
 	disableUpload := false
 
+	// NOUP from env
+	_, isnoUp := os.LookupEnv("NOUP")
+	if isnoUp {
+		disableUpload = true
+	}
+
 	// Parse arguments
 	progArgs := os.Args[1:]
 	for i := 0; i < len(progArgs); i++ {
