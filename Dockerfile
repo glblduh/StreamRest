@@ -1,15 +1,17 @@
 # Builder
-FROM golang:1.18.0 AS builder
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+RUN apk update && apk add --no-cache git build-base
 WORKDIR /builder
 COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 COPY streamrest.go ./
-RUN go build -o /streamrest
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o /builder/streamrest
 
 # Deploy
-FROM alpine:latest AS deploy
-WORKDIR /streamrest
-COPY --from=builder /streamrest /streamrest/streamrest
+FROM scratch
+COPY --from=builder /builder/streamrest /streamrest
 EXPOSE 1010
-ENTRYPOINT ["/streamrest/streamrest"]
+ENTRYPOINT ["/streamrest"]
