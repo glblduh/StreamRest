@@ -129,8 +129,8 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(allTorrents); i++ {
 		if allTorrents[i].InfoHash().String() == rtBodyRes.InfoHash {
 			allTorrents[i].Drop()
-			os.Remove(filepath.Join(".", "streamrest", "downloads", allTorrents[i].Name()))
-			os.RemoveAll(filepath.Join(".", "streamrest", "downloads", allTorrents[i].Name()))
+			os.Remove(filepath.Join(".", "streamrest", allTorrents[i].Name()))
+			os.RemoveAll(filepath.Join(".", "streamrest", allTorrents[i].Name()))
 			break
 		}
 	}
@@ -205,21 +205,43 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Make streamrest directory if doesn't exist
-	os.MkdirAll(filepath.Join(".", "streamrest"), os.ModePerm)
-	os.MkdirAll(filepath.Join(".", "streamrest", "downloads"), os.ModePerm)
+	// Vars
+	httpHost := ":1010"
+	dataDir := ""
+	disableUpload := false
+
+	// Parse arguments
+	progArgs := os.Args[1:]
+	for i := 0; i < len(progArgs); i++ {
+		if progArgs[i] == "-l" {
+			httpHost = progArgs[i+1]
+		}
+		if progArgs[i] == "-d" {
+			dataDir = progArgs[i+1]
+		}
+		if progArgs[i] == "--noup" {
+			disableUpload = true
+		}
+	}
 
 	// Make config
 	tcliConfs := torrent.NewDefaultClientConfig()
 
-	// Set the download directory to streamrest directory
-	tcliConfs.DataDir = filepath.Join(".", "streamrest", "downloads")
+	if dataDir == "" {
+		// Make streamrest directory if doesn't exist
+		os.MkdirAll(filepath.Join(".", "streamrest"), os.ModePerm)
+		// Set the download directory to streamrest directory
+		tcliConfs.DataDir = filepath.Join(".", "streamrest")
+	} else {
+		// Set download directory to specified directory
+		fmt.Printf("[INFO] Download directory is set to: %s\n", filepath.Join(dataDir))
+		tcliConfs.DataDir = filepath.Join(dataDir)
+	}
 
-	// Check for NOUPLOAD env key to disable upload
-	_, existEnvNoUpload := os.LookupEnv("NOUPLOAD")
-	if existEnvNoUpload {
+	// Disable upload if specified
+	if disableUpload {
 		fmt.Println("[INFO] Upload is disabled")
-		tcliConfs.NoUpload = existEnvNoUpload
+		tcliConfs.NoUpload = true
 	}
 
 	// Make the torrent client
@@ -233,11 +255,6 @@ func main() {
 	http.HandleFunc("/api/torrent", torrentStats)
 
 	// Start listening
-	httpHost := ":1010"
-	envHost, existEnvHost := os.LookupEnv("HOST")
-	if existEnvHost {
-		httpHost = envHost
-	}
 	fmt.Printf("[INFO] Listening on http://%s\n", httpHost)
 	http.ListenAndServe(httpHost, nil)
 }
