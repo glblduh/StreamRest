@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
 )
 
 var torrentCli *torrent.Client
@@ -57,12 +58,8 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	// Get all files
 	torrentFiles := t.Files()
 	for i := 0; i < len(torrentFiles); i++ {
-		if strings.Contains(torrentFiles[i].DisplayPath(), "/") {
-			modFileName := strings.Split(torrentFiles[i].DisplayPath(), "/")
-			amRes.Files = append(amRes.Files, modFileName[len(modFileName)-1])
-		} else {
-			amRes.Files = append(amRes.Files, torrentFiles[i].DisplayPath())
-		}
+		modFileName := strings.Split(torrentFiles[i].DisplayPath(), "/")
+		amRes.Files = append(amRes.Files, modFileName[len(modFileName)-1])
 	}
 
 	// Send response
@@ -77,29 +74,35 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 
 	if !ihok || !fnok {
 		w.WriteHeader(404)
+		w.Header().Set("Content-Type", "application/json")
 		eRes.Error = "InfoHash or FileName is not provided"
 		json.NewEncoder(w).Encode(&eRes)
 		return
 	}
 
-	// Find file from torrents then start downloads
-	var allTorrents = torrentCli.Torrents()
-	var torrentFiles []*torrent.File
-	for i := 0; i < len(allTorrents); i++ {
-		if allTorrents[i].InfoHash().String() == infoHash[0] {
-			torrentFiles = allTorrents[i].Files()
-			for j := 0; j < len(torrentFiles); j++ {
-				if strings.Contains(torrentFiles[j].DisplayPath(), fileName[0]) {
-					torrentFiles[j].Download()
-					fileRead := torrentFiles[j].NewReader()
-					fileRead.SetReadahead(torrentFiles[j].Length() / 100)
-					fileRead.SetResponsive()
-					fileRead.Seek(torrentFiles[j].Offset(), io.SeekStart)
-					w.Header().Set("Content-Disposition", "attachment; filename=\""+torrentFiles[j].DisplayPath()+"\"")
-					http.ServeContent(w, r, torrentFiles[j].DisplayPath(), time.Now(), fileRead)
-					break
-				}
-			}
+	// Get torrent handler
+	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
+
+	// Torrent not found
+	if !tok {
+		w.WriteHeader(404)
+		w.Header().Set("Content-Type", "application/json")
+		eRes.Error = "Torrent not found"
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Get file from query
+	tFiles := t.Files()
+	for i := 0; i < len(tFiles); i++ {
+		if strings.Contains(tFiles[i].DisplayPath(), fileName[0]) {
+			tFiles[i].Download()
+			fileRead := tFiles[i].NewReader()
+			fileRead.SetReadahead(tFiles[i].Length() / 100)
+			fileRead.SetResponsive()
+			fileRead.Seek(tFiles[i].Offset(), io.SeekStart)
+			w.Header().Set("Content-Disposition", "attachment; filename=\""+t.Info().Name+"\"")
+			http.ServeContent(w, r, tFiles[i].DisplayPath(), time.Now(), fileRead)
 			break
 		}
 	}
@@ -126,16 +129,22 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find torrent and remove it
-	allTorrents := torrentCli.Torrents()
-	for i := 0; i < len(allTorrents); i++ {
-		if allTorrents[i].InfoHash().String() == rtBodyRes.InfoHash {
-			allTorrents[i].Drop()
-			os.Remove(filepath.Join(tcliConfs.DataDir, allTorrents[i].Name()))
-			os.RemoveAll(filepath.Join(tcliConfs.DataDir, allTorrents[i].Name()))
-			break
-		}
+	// Find torrent
+	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(rtBodyRes.InfoHash))
+
+	// Torrent not found
+	if !tok {
+		w.WriteHeader(404)
+		eRes.Error = "Torrent not found"
+		json.NewEncoder(w).Encode(&eRes)
+		return
 	}
+
+	// Drop from torrent client
+	t.Drop()
+
+	// Deletes files
+	os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name()))
 
 	// Send request body as response
 	json.NewEncoder(w).Encode(&rtBodyRes)
@@ -193,37 +202,32 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get info from torrent selected
-	allTorrents := torrentCli.Torrents()
-	for i := 0; i < len(allTorrents); i++ {
-		if allTorrents[i].InfoHash().String() == tsBody.InfoHash {
-			// Set corresponding data
-			tsRes.InfoHash = allTorrents[i].InfoHash().String()
-			tsRes.Name = allTorrents[i].Name()
-			tsRes.TotalPeers = allTorrents[i].Stats().TotalPeers
-			tsRes.ActivePeers = allTorrents[i].Stats().ActivePeers
-			tsRes.HalfOpenPeers = allTorrents[i].Stats().HalfOpenPeers
-			tsRes.PendingPeers = allTorrents[i].Stats().PendingPeers
+	// Get torrent handler
+	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(tsBody.InfoHash))
 
-			// Get all files on torrent
-			torrentFiles := allTorrents[i].Files()
-			for j := 0; j < len(torrentFiles); j++ {
-				if strings.Contains(torrentFiles[j].DisplayPath(), "/") {
-					modFileName := strings.Split(torrentFiles[j].DisplayPath(), "/")
-					tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, modFileName[len(modFileName)-1])
-				} else {
-					tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentFiles[j].DisplayPath())
-				}
-				if torrentFiles[j].BytesCompleted() != 0 {
-					if strings.Contains(torrentFiles[j].DisplayPath(), "/") {
-						modFileName := strings.Split(torrentFiles[j].DisplayPath(), "/")
-						tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, modFileName[len(modFileName)-1])
-					} else {
-						tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentFiles[j].DisplayPath())
-					}
-				}
-			}
-			break
+	// Not found
+	if !tok {
+		w.WriteHeader(404)
+		eRes.Error = "Torrent not found"
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Set corresponding stats
+	tsRes.InfoHash = t.InfoHash().String()
+	tsRes.Name = t.Name()
+	tsRes.TotalPeers = t.Stats().TotalPeers
+	tsRes.ActivePeers = t.Stats().ActivePeers
+	tsRes.HalfOpenPeers = t.Stats().HalfOpenPeers
+	tsRes.PendingPeers = t.Stats().PendingPeers
+
+	// Get files
+	tFiles := t.Files()
+	for i := 0; i < len(tFiles); i++ {
+		fileName := strings.Split(tFiles[i].DisplayPath(), "/")
+		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, fileName[len(fileName)-1])
+		if tFiles[i].BytesCompleted() != 0 {
+			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, fileName[len(fileName)-1])
 		}
 	}
 
@@ -270,7 +274,7 @@ func main() {
 		// Set download directory to specified directory
 		tcliConfs.DataDir = filepath.Join(dataDir)
 	}
-	fmt.Printf("[INFO] Download directory is set to: %s\n", filepath.Join(dataDir))
+	fmt.Printf("[INFO] Download directory is set to: %s\n", tcliConfs.DataDir)
 
 	// Disable upload if specified
 	if disableUpload {
