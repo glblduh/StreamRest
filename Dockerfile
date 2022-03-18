@@ -13,4 +13,4 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s
 FROM gcr.io/distroless/base
 COPY --from=builder /builder/streamrest /sr
 EXPOSE 1010
-ENTRYPOINT ["/sr"] 
+ENTRYPOINT ["/sr", "-d", "/streamrest"] 

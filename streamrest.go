@@ -313,10 +313,12 @@ func main() {
 	tcliConfs = torrent.NewDefaultClientConfig()
 
 	if dataDir == "" {
+		// Get current working directory
+		pwd, _ := os.Getwd()
 		// Make streamrest directory if doesn't exist
-		os.MkdirAll(filepath.Join(".", "streamrest"), os.ModePerm)
+		os.MkdirAll(filepath.Join(pwd, "streamrest"), os.ModePerm)
 		// Set the download directory to streamrest directory
-		tcliConfs.DataDir = filepath.Join(".", "streamrest")
+		tcliConfs.DataDir = filepath.Join(pwd, "streamrest")
 	} else {
 		// Set download directory to specified directory
 		tcliConfs.DataDir = filepath.Join(dataDir)
