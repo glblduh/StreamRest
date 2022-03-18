@@ -14,6 +14,7 @@ import (
 )
 
 var torrentCli *torrent.Client
+var tcliConfs *torrent.ClientConfig
 
 type errorRes struct {
 	Error string
@@ -130,8 +131,8 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(allTorrents); i++ {
 		if allTorrents[i].InfoHash().String() == rtBodyRes.InfoHash {
 			allTorrents[i].Drop()
-			os.Remove(filepath.Join(".", "streamrest", allTorrents[i].Name()))
-			os.RemoveAll(filepath.Join(".", "streamrest", allTorrents[i].Name()))
+			os.Remove(filepath.Join(tcliConfs.DataDir, allTorrents[i].Name()))
+			os.RemoveAll(filepath.Join(tcliConfs.DataDir, allTorrents[i].Name()))
 			break
 		}
 	}
@@ -166,11 +167,16 @@ type torrentStatsBody struct {
 type torrentStatsRes struct {
 	InfoHash      string
 	Name          string
-	isSeeding     bool
 	TotalPeers    int
 	ActivePeers   int
 	PendingPeers  int
 	HalfOpenPeers int
+	Files         torrentStatsFiles
+}
+
+type torrentStatsFiles struct {
+	OnTorrent []string
+	OnDisk    []string
 }
 
 func torrentStats(w http.ResponseWriter, r *http.Request) {
@@ -191,13 +197,32 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	allTorrents := torrentCli.Torrents()
 	for i := 0; i < len(allTorrents); i++ {
 		if allTorrents[i].InfoHash().String() == tsBody.InfoHash {
+			// Set corresponding data
 			tsRes.InfoHash = allTorrents[i].InfoHash().String()
 			tsRes.Name = allTorrents[i].Name()
-			tsRes.isSeeding = allTorrents[i].Seeding()
 			tsRes.TotalPeers = allTorrents[i].Stats().TotalPeers
 			tsRes.ActivePeers = allTorrents[i].Stats().ActivePeers
 			tsRes.HalfOpenPeers = allTorrents[i].Stats().HalfOpenPeers
 			tsRes.PendingPeers = allTorrents[i].Stats().PendingPeers
+
+			// Get all files on torrent
+			torrentFiles := allTorrents[i].Files()
+			for j := 0; j < len(torrentFiles); j++ {
+				if strings.Contains(torrentFiles[j].DisplayPath(), "/") {
+					modFileName := strings.Split(torrentFiles[j].DisplayPath(), "/")
+					tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, modFileName[len(modFileName)-1])
+				} else {
+					tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentFiles[j].DisplayPath())
+				}
+				if torrentFiles[j].BytesCompleted() != 0 {
+					if strings.Contains(torrentFiles[j].DisplayPath(), "/") {
+						modFileName := strings.Split(torrentFiles[j].DisplayPath(), "/")
+						tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, modFileName[len(modFileName)-1])
+					} else {
+						tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentFiles[j].DisplayPath())
+					}
+				}
+			}
 			break
 		}
 	}
@@ -234,7 +259,7 @@ func main() {
 	}
 
 	// Make config
-	tcliConfs := torrent.NewDefaultClientConfig()
+	tcliConfs = torrent.NewDefaultClientConfig()
 
 	if dataDir == "" {
 		// Make streamrest directory if doesn't exist
@@ -243,9 +268,9 @@ func main() {
 		tcliConfs.DataDir = filepath.Join(".", "streamrest")
 	} else {
 		// Set download directory to specified directory
-		fmt.Printf("[INFO] Download directory is set to: %s\n", filepath.Join(dataDir))
 		tcliConfs.DataDir = filepath.Join(dataDir)
 	}
+	fmt.Printf("[INFO] Download directory is set to: %s\n", filepath.Join(dataDir))
 
 	// Disable upload if specified
 	if disableUpload {
