@@ -7,7 +7,7 @@ RUN go mod download
 COPY streamrest.go ./
 ARG TARGETOS
 ARG TARGETARCH
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o /builder/streamrest;
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -tags=nosqlite -o /builder/streamrest;
 
 # Deploy
 FROM gcr.io/distroless/base
