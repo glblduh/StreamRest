@@ -29,6 +29,12 @@ The default HTTP port is `1010`
 }
 ```
 
+### Select file
+`/api/selectfile`
+
+*The selectfile URL is using queries rather than JSON.*
+The keys are `infohash` and `filename`.
+
 ### Stream file
 `/api/stream`
 

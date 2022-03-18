@@ -66,7 +66,54 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&amRes)
 }
 
+type beginFileDownloadRes struct {
+	InfoHash string
+	FileName string
+}
+
 func beginFileDownload(w http.ResponseWriter, r *http.Request) {
+	var eRes errorRes
+	var bfdRes beginFileDownloadRes
+	// Get query values
+	infoHash, ihok := r.URL.Query()["infohash"]
+	fileName, fnok := r.URL.Query()["filename"]
+
+	if !ihok || !fnok {
+		w.WriteHeader(404)
+		w.Header().Set("Content-Type", "application/json")
+		eRes.Error = "InfoHash or FileName is not provided"
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Get torrent handler
+	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
+
+	// Torrent not found
+	w.Header().Set("Content-Type", "application/json")
+	if !tok {
+		w.WriteHeader(404)
+		eRes.Error = "Torrent not found"
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Get file from query
+	tFiles := t.Files()
+	for i := 0; i < len(tFiles); i++ {
+		if strings.Contains(tFiles[i].DisplayPath(), fileName[0]) {
+			tFiles[i].Download()
+			break
+		}
+	}
+
+	// Send response
+	bfdRes.InfoHash = infoHash[0]
+	bfdRes.FileName = fileName[0]
+	json.NewEncoder(w).Encode(&bfdRes)
+}
+
+func beginStream(w http.ResponseWriter, r *http.Request) {
 	var eRes errorRes
 	// Get query values
 	infoHash, ihok := r.URL.Query()["infohash"]
@@ -287,7 +334,8 @@ func main() {
 
 	// HTTP Endpoints
 	http.HandleFunc("/api/addmagnet", addMagnet)
-	http.HandleFunc("/api/stream", beginFileDownload)
+	http.HandleFunc("/api/selectfile", beginFileDownload)
+	http.HandleFunc("/api/stream", beginStream)
 	http.HandleFunc("/api/removetorrent", removeTorrent)
 	http.HandleFunc("/api/torrents", listTorrents)
 	http.HandleFunc("/api/torrent", torrentStats)
