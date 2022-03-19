@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,19 +67,25 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&amRes)
 }
 
-type beginFileDownloadRes struct {
+type beginFileDownloadBody struct {
 	InfoHash string
 	FileName string
 }
 
+type beginFileDownloadRes struct {
+	InfoHash  string
+	FileName  string
+	StreamURL string
+}
+
 func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 	var eRes errorRes
+	var bfdBody beginFileDownloadBody
 	var bfdRes beginFileDownloadRes
-	// Get query values
-	infoHash, ihok := r.URL.Query()["infohash"]
-	fileName, fnok := r.URL.Query()["filename"]
 
-	if !ihok || !fnok {
+	// Parse JSON body
+	json.NewDecoder(r.Body).Decode(&bfdBody)
+	if bfdBody.InfoHash == "" || bfdBody.FileName == "" {
 		w.WriteHeader(404)
 		w.Header().Set("Content-Type", "application/json")
 		eRes.Error = "InfoHash or FileName is not provided"
@@ -87,7 +94,7 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get torrent handler
-	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
+	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(bfdBody.InfoHash))
 
 	// Torrent not found
 	w.Header().Set("Content-Type", "application/json")
@@ -101,15 +108,16 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 	// Get file from query
 	tFiles := t.Files()
 	for i := 0; i < len(tFiles); i++ {
-		if strings.Contains(tFiles[i].DisplayPath(), fileName[0]) {
+		if strings.Contains(tFiles[i].DisplayPath(), bfdBody.FileName) {
 			tFiles[i].Download()
 			break
 		}
 	}
 
 	// Send response
-	bfdRes.InfoHash = infoHash[0]
-	bfdRes.FileName = fileName[0]
+	bfdRes.InfoHash = bfdBody.InfoHash
+	bfdRes.FileName = bfdBody.FileName
+	bfdRes.StreamURL = "/api/stream?infohash=" + bfdBody.InfoHash + "&filename=" + url.QueryEscape(bfdBody.FileName)
 	json.NewEncoder(w).Encode(&bfdRes)
 }
 
@@ -212,6 +220,10 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Send response
+	if len(ltRes.Torrents) < 1 {
+		w.WriteHeader(404)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(&ltRes)
 }
