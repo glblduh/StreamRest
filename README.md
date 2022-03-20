@@ -42,6 +42,7 @@ Initialize file for download
 {
     InfoHash: "infohash"
     FileName: "filename"
+    AllFiles: false (Set true to download all files)
 }
 ```
 

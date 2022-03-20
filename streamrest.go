@@ -70,10 +70,12 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 type beginFileDownloadBody struct {
 	InfoHash string
 	FileName string
+	AllFiles bool
 }
 
 type beginFileDownloadRes struct {
 	InfoHash  string
+	AllFiles  bool
 	FileName  string
 	StreamURL string
 }
@@ -102,6 +104,15 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		eRes.Error = "Torrent not found"
 		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// If all files downloaded
+	if bfdBody.AllFiles {
+		t.DownloadAll()
+		bfdRes.InfoHash = bfdBody.InfoHash
+		bfdRes.AllFiles = bfdBody.AllFiles
+		json.NewEncoder(w).Encode(&bfdRes)
 		return
 	}
 
@@ -243,8 +254,19 @@ type torrentStatsRes struct {
 }
 
 type torrentStatsFiles struct {
-	OnTorrent []string
-	OnDisk    []string
+	OnTorrent []torrentStatsFilesOnTorrent
+	OnDisk    []torrentStatsFilesOnDisk
+}
+
+type torrentStatsFilesOnTorrent struct {
+	FileName string
+	FileSize int
+}
+
+type torrentStatsFilesOnDisk struct {
+	FileName        string
+	BytesDownloaded int
+	FileSize        int
 }
 
 func torrentStats(w http.ResponseWriter, r *http.Request) {
@@ -284,9 +306,16 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	tFiles := t.Files()
 	for i := 0; i < len(tFiles); i++ {
 		fileName := strings.Split(tFiles[i].DisplayPath(), "/")
-		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, fileName[len(fileName)-1])
+		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentStatsFilesOnTorrent{
+			FileName: fileName[len(fileName)-1],
+			FileSize: int(tFiles[i].Length()),
+		})
 		if tFiles[i].BytesCompleted() != 0 {
-			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, fileName[len(fileName)-1])
+			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
+				FileName:        fileName[len(fileName)-1],
+				BytesDownloaded: int(tFiles[i].BytesCompleted()),
+				FileSize:        int(tFiles[i].Length()),
+			})
 		}
 	}
 
