@@ -28,7 +28,12 @@ type addMagnetBody struct {
 
 type addMagnetRes struct {
 	InfoHash string
-	Files    []string
+	Files    []addMagnetFiles
+}
+
+type addMagnetFiles struct {
+	FileName      string
+	FileSizeBytes int
 }
 
 func addMagnet(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +65,10 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	torrentFiles := t.Files()
 	for i := 0; i < len(torrentFiles); i++ {
 		modFileName := strings.Split(torrentFiles[i].DisplayPath(), "/")
-		amRes.Files = append(amRes.Files, modFileName[len(modFileName)-1])
+		amRes.Files = append(amRes.Files, addMagnetFiles{
+			FileName:      modFileName[len(modFileName)-1],
+			FileSizeBytes: int(torrentFiles[i].Length()),
+		})
 	}
 
 	// Send response
@@ -259,14 +267,14 @@ type torrentStatsFiles struct {
 }
 
 type torrentStatsFilesOnTorrent struct {
-	FileName string
-	FileSize int
+	FileName      string
+	FileSizeBytes int
 }
 
 type torrentStatsFilesOnDisk struct {
 	FileName        string
 	BytesDownloaded int
-	FileSize        int
+	FileSizeBytes   int
 }
 
 func torrentStats(w http.ResponseWriter, r *http.Request) {
@@ -307,14 +315,14 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(tFiles); i++ {
 		fileName := strings.Split(tFiles[i].DisplayPath(), "/")
 		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentStatsFilesOnTorrent{
-			FileName: fileName[len(fileName)-1],
-			FileSize: int(tFiles[i].Length()),
+			FileName:      fileName[len(fileName)-1],
+			FileSizeBytes: int(tFiles[i].Length()),
 		})
 		if tFiles[i].BytesCompleted() != 0 {
 			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
 				FileName:        fileName[len(fileName)-1],
 				BytesDownloaded: int(tFiles[i].BytesCompleted()),
-				FileSize:        int(tFiles[i].Length()),
+				FileSizeBytes:   int(tFiles[i].Length()),
 			})
 		}
 	}
