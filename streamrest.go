@@ -126,11 +126,21 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 
 	// Get file from query
 	tFiles := t.Files()
+	fileFound := false
 	for i := 0; i < len(tFiles); i++ {
 		if strings.Contains(tFiles[i].DisplayPath(), bfdBody.FileName) {
 			tFiles[i].Download()
+			fileFound = true
 			break
 		}
+	}
+
+	// If file is not found
+	if !fileFound {
+		w.WriteHeader(404)
+		eRes.Error = "File not found"
+		json.NewEncoder(w).Encode(&eRes)
+		return
 	}
 
 	// Send response
