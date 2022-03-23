@@ -29,6 +29,7 @@ type addMagnetBody struct {
 
 type addMagnetRes struct {
 	InfoHash string
+	Name     string
 	Files    []addMagnetFiles
 }
 
@@ -61,6 +62,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 
 	// Make response
 	amRes.InfoHash = t.InfoHash().String()
+	amRes.Name = t.Name()
 
 	// Get all files
 	torrentFiles := t.Files()
