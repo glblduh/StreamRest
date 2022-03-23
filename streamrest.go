@@ -13,6 +13,7 @@ import (
 
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/rs/cors"
 )
 
 var torrentCli *torrent.Client
@@ -235,7 +236,12 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 }
 
 type listTorrentsRes struct {
-	Torrents []string
+	Torrents []listTorrentNameInfoHash
+}
+
+type listTorrentNameInfoHash struct {
+	Name     string
+	InfoHash string
 }
 
 func listTorrents(w http.ResponseWriter, r *http.Request) {
@@ -245,7 +251,10 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 	// Get infohash of all of the torrents
 	allTorrents := torrentCli.Torrents()
 	for i := 0; i < len(allTorrents); i++ {
-		ltRes.Torrents = append(ltRes.Torrents, allTorrents[i].InfoHash().String())
+		ltRes.Torrents = append(ltRes.Torrents, listTorrentNameInfoHash{
+			Name:     allTorrents[i].Name(),
+			InfoHash: allTorrents[i].InfoHash().String(),
+		})
 	}
 
 	//Send response
@@ -255,10 +264,6 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(&ltRes)
-}
-
-type torrentStatsBody struct {
-	InfoHash string
 }
 
 type torrentStatsRes struct {
@@ -289,20 +294,19 @@ type torrentStatsFilesOnDisk struct {
 
 func torrentStats(w http.ResponseWriter, r *http.Request) {
 	// Vars for request body and response
-	var tsBody torrentStatsBody
+	infoHash, ihok := r.URL.Query()["infohash"]
 	var tsRes torrentStatsRes
 	var eRes errorRes
 
 	// Decodes request body to JSON
-	json.NewDecoder(r.Body).Decode(&tsBody)
-	if tsBody.InfoHash == "" {
+	if !ihok {
 		eRes.Error = "InfoHash is not provided"
 		json.NewEncoder(w).Encode(&eRes)
 		return
 	}
 
 	// Get torrent handler
-	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(tsBody.InfoHash))
+	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
 	// Not found
 	if !tok {
@@ -394,14 +398,22 @@ func main() {
 	torrentCli, _ = torrent.NewClient(tcliConfs)
 
 	// HTTP Endpoints
-	http.HandleFunc("/api/addmagnet", addMagnet)
-	http.HandleFunc("/api/selectfile", beginFileDownload)
-	http.HandleFunc("/api/stream", beginStream)
-	http.HandleFunc("/api/removetorrent", removeTorrent)
-	http.HandleFunc("/api/torrents", listTorrents)
-	http.HandleFunc("/api/torrent", torrentStats)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/addmagnet", addMagnet)
+	mux.HandleFunc("/api/selectfile", beginFileDownload)
+	mux.HandleFunc("/api/stream", beginStream)
+	mux.HandleFunc("/api/removetorrent", removeTorrent)
+	mux.HandleFunc("/api/torrents", listTorrents)
+	mux.HandleFunc("/api/torrent", torrentStats)
+
+	// CORS
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "DELETE"},
+		AllowCredentials: true,
+	})
 
 	// Start listening
 	fmt.Printf("[INFO] Listening on http://%s\n", httpHost)
-	http.ListenAndServe(httpHost, nil)
+	http.ListenAndServe(httpHost, c.Handler(mux))
 }

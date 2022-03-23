@@ -72,14 +72,11 @@ Stops torrent download and deletes its files
 
 A array of infohash of all active torrents
 
-### Get Torrent info `(POST)`
+### Get Torrent info `(GET)`
 `/api/torrent`
 
 Get info about the torrent
 
-**Request body**
 ```
-{
-    InfoHash: "infohash"
-}
+/api/torrent?infohash="infohash"
 ```
