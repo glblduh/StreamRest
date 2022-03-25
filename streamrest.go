@@ -177,7 +177,6 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 	tFiles := t.Files()
 	for i := 0; i < len(tFiles); i++ {
 		if strings.Contains(strings.ToLower(tFiles[i].DisplayPath()), strings.ToLower(fileName[0])) {
-			tFiles[i].Download()
 			fileRead := tFiles[i].NewReader()
 			fileRead.SetReadahead(tFiles[i].Length() / 100)
 			fileRead.SetResponsive()
