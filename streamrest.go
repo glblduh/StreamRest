@@ -80,15 +80,15 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 
 type beginFileDownloadBody struct {
 	InfoHash string
-	FileName string
+	Files    []string
 	AllFiles bool
 }
 
 type beginFileDownloadRes struct {
 	InfoHash  string
 	AllFiles  bool
-	FileName  string
-	StreamURL string
+	Files     []string
+	StreamURL []string
 }
 
 func beginFileDownload(w http.ResponseWriter, r *http.Request) {
@@ -98,10 +98,10 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 
 	// Parse JSON body
 	json.NewDecoder(r.Body).Decode(&bfdBody)
-	if bfdBody.InfoHash == "" || bfdBody.FileName == "" {
+	if bfdBody.InfoHash == "" || len(bfdBody.Files) < 1 {
 		w.WriteHeader(404)
 		w.Header().Set("Content-Type", "application/json")
-		eRes.Error = "InfoHash or FileName is not provided"
+		eRes.Error = "InfoHash or Files is not provided"
 		json.NewEncoder(w).Encode(&eRes)
 		return
 	}
@@ -129,27 +129,21 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 
 	// Get file from query
 	tFiles := t.Files()
-	fileFound := false
-	for i := 0; i < len(tFiles); i++ {
-		if strings.Contains(tFiles[i].DisplayPath(), bfdBody.FileName) {
-			tFiles[i].Download()
-			fileFound = true
-			break
+	for i := 0; i < len(bfdBody.Files); i++ {
+		bfdRes.Files = append(bfdRes.Files, "NOT FOUND")
+		bfdRes.StreamURL = append(bfdRes.StreamURL, "NOT FOUND")
+		for j := 0; j < len(tFiles); j++ {
+			if bfdBody.Files[i] != "" && strings.Contains(strings.ToLower(tFiles[j].DisplayPath()), strings.ToLower(bfdBody.Files[i])) {
+				bfdRes.Files[i] = bfdBody.Files[i]
+				bfdRes.StreamURL[i] = "/api/stream?infohash=" + bfdBody.InfoHash + "&filename=" + url.QueryEscape(bfdBody.Files[i])
+				tFiles[j].Download()
+				break
+			}
 		}
-	}
-
-	// If file is not found
-	if !fileFound {
-		w.WriteHeader(404)
-		eRes.Error = "File not found"
-		json.NewEncoder(w).Encode(&eRes)
-		return
 	}
 
 	// Send response
 	bfdRes.InfoHash = bfdBody.InfoHash
-	bfdRes.FileName = bfdBody.FileName
-	bfdRes.StreamURL = "/api/stream?infohash=" + bfdBody.InfoHash + "&filename=" + url.QueryEscape(bfdBody.FileName)
 	json.NewEncoder(w).Encode(&bfdRes)
 }
 
@@ -182,7 +176,7 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 	// Get file from query
 	tFiles := t.Files()
 	for i := 0; i < len(tFiles); i++ {
-		if strings.Contains(tFiles[i].DisplayPath(), fileName[0]) {
+		if strings.Contains(strings.ToLower(tFiles[i].DisplayPath()), strings.ToLower(fileName[0])) {
 			tFiles[i].Download()
 			fileRead := tFiles[i].NewReader()
 			fileRead.SetReadahead(tFiles[i].Length() / 100)
