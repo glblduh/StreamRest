@@ -38,11 +38,18 @@ type addMagnetFiles struct {
 	FileSizeBytes int
 }
 
+type addMagnetOneFileRes struct {
+	InfoHash  string
+	Name      string
+	StreamURL string
+}
+
 func addMagnet(w http.ResponseWriter, r *http.Request) {
 	// Variables for JSON request body and response
 	var amBody addMagnetBody
 	var amRes addMagnetRes
 	var eRes errorRes
+	var amOFRes addMagnetOneFileRes
 
 	// Decode JSON of request body and set response Content-Type to JSON
 	w.Header().Set("Content-Type", "application/json")
@@ -59,6 +66,17 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	// Add magnet to torrent client
 	t, _ := torrentCli.AddMagnet(amBody.Magnet)
 	<-t.GotInfo()
+
+	// If torrent have only one file, start downloading the file
+	if !t.Info().IsDir() {
+		t.Files()[0].Download()
+		amOFRes.InfoHash = t.InfoHash().String()
+		amOFRes.Name = t.Name()
+		modFileName := strings.Split(t.Files()[0].DisplayPath(), "/")
+		amOFRes.StreamURL = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1])
+		json.NewEncoder(w).Encode(&amOFRes)
+		return
+	}
 
 	// Make response
 	amRes.InfoHash = t.InfoHash().String()
