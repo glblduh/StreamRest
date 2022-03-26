@@ -25,6 +25,7 @@ type errorRes struct {
 
 type addMagnetBody struct {
 	Magnet string
+	Files  []string
 }
 
 type addMagnetRes struct {
@@ -44,12 +45,19 @@ type addMagnetOneFileRes struct {
 	StreamURL string
 }
 
+type addMagnetSelFiles struct {
+	InfoHash  string
+	Name      string
+	StreamURL []string
+}
+
 func addMagnet(w http.ResponseWriter, r *http.Request) {
 	// Variables for JSON request body and response
 	var amBody addMagnetBody
 	var amRes addMagnetRes
 	var eRes errorRes
 	var amOFRes addMagnetOneFileRes
+	var amSFRes addMagnetSelFiles
 
 	// Decode JSON of request body and set response Content-Type to JSON
 	w.Header().Set("Content-Type", "application/json")
@@ -75,6 +83,27 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		modFileName := strings.Split(t.Files()[0].DisplayPath(), "/")
 		amOFRes.StreamURL = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1])
 		json.NewEncoder(w).Encode(&amOFRes)
+		return
+	}
+
+	// If request have pre-selected files for stream
+	if len(amBody.Files) > 0 {
+		amSFRes.InfoHash = t.InfoHash().String()
+		amSFRes.Name = t.Name()
+
+		// Get file from query
+		tFiles := t.Files()
+		for i := 0; i < len(amBody.Files); i++ {
+			amSFRes.StreamURL = append(amSFRes.StreamURL, "NOT FOUND")
+			for j := 0; j < len(tFiles); j++ {
+				if amBody.Files[i] != "" && strings.Contains(strings.ToLower(tFiles[j].DisplayPath()), strings.ToLower(amBody.Files[i])) {
+					amSFRes.StreamURL[i] = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(amBody.Files[i])
+					tFiles[j].Download()
+					break
+				}
+			}
+		}
+		json.NewEncoder(w).Encode(&amSFRes)
 		return
 	}
 

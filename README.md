@@ -28,7 +28,8 @@ Add a torrent to the server
 **Request body**
 ```
 {
-    Magnet: "magnetlink"
+    Magnet: "magnetlink",
+    Files: arrayofpreselectedfiles[]
 }
 ```
 
