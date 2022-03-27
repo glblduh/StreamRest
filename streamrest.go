@@ -330,6 +330,7 @@ type torrentStatsFilesOnTorrent struct {
 
 type torrentStatsFilesOnDisk struct {
 	FileName        string
+	StreamURL       string
 	BytesDownloaded int
 	FileSizeBytes   int
 }
@@ -377,6 +378,7 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 		if tFiles[i].BytesCompleted() != 0 {
 			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
 				FileName:        fileName[len(fileName)-1],
+				StreamURL:       "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(fileName[len(fileName)-1]),
 				BytesDownloaded: int(tFiles[i].BytesCompleted()),
 				FileSizeBytes:   int(tFiles[i].Length()),
 			})
