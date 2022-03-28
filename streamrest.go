@@ -46,9 +46,10 @@ type addMagnetOneFileRes struct {
 }
 
 type addMagnetSelFiles struct {
-	InfoHash  string
-	Name      string
-	StreamURL []string
+	InfoHash    string
+	Name        string
+	StreamURL   []string
+	PlaylistURL string
 }
 
 func addMagnet(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +82,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		amOFRes.InfoHash = t.InfoHash().String()
 		amOFRes.Name = t.Name()
 		modFileName := strings.Split(t.Files()[0].DisplayPath(), "/")
-		amOFRes.StreamURL = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1])
+		amOFRes.StreamURL = "http://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1])
 		json.NewEncoder(w).Encode(&amOFRes)
 		return
 	}
@@ -90,15 +91,16 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	if len(amBody.Files) > 0 {
 		amSFRes.InfoHash = t.InfoHash().String()
 		amSFRes.Name = t.Name()
+		amSFRes.PlaylistURL = "http://" + r.Host + "/api/playlist?infohash=" + t.InfoHash().String()
 
 		// Get file from query
-		tFiles := t.Files()
-		for i := 0; i < len(amBody.Files); i++ {
+		for i, ambFile := range amBody.Files {
 			amSFRes.StreamURL = append(amSFRes.StreamURL, "NOT FOUND")
-			for j := 0; j < len(tFiles); j++ {
-				if amBody.Files[i] != "" && strings.Contains(strings.ToLower(tFiles[j].DisplayPath()), strings.ToLower(amBody.Files[i])) {
-					amSFRes.StreamURL[i] = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(amBody.Files[i])
-					tFiles[j].Download()
+			for _, tFile := range t.Files() {
+				if ambFile != "" && strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(ambFile)) {
+					amSFRes.StreamURL[i] = "http://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(ambFile)
+					amSFRes.PlaylistURL += "&file=" + url.QueryEscape(ambFile)
+					tFile.Download()
 					break
 				}
 			}
@@ -112,12 +114,11 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	amRes.Name = t.Name()
 
 	// Get all files
-	torrentFiles := t.Files()
-	for i := 0; i < len(torrentFiles); i++ {
-		modFileName := strings.Split(torrentFiles[i].DisplayPath(), "/")
+	for _, tFile := range t.Files() {
+		modFileName := strings.Split(tFile.DisplayPath(), "/")
 		amRes.Files = append(amRes.Files, addMagnetFiles{
 			FileName:      modFileName[len(modFileName)-1],
-			FileSizeBytes: int(torrentFiles[i].Length()),
+			FileSizeBytes: int(tFile.Length()),
 		})
 	}
 
@@ -132,10 +133,11 @@ type beginFileDownloadBody struct {
 }
 
 type beginFileDownloadRes struct {
-	InfoHash  string
-	AllFiles  bool
-	Files     []string
-	StreamURL []string
+	InfoHash    string
+	AllFiles    bool
+	Files       []string
+	StreamURL   []string
+	PlaylistURL string
 }
 
 func beginFileDownload(w http.ResponseWriter, r *http.Request) {
@@ -175,15 +177,16 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get file from query
-	tFiles := t.Files()
-	for i := 0; i < len(bfdBody.Files); i++ {
+	bfdRes.PlaylistURL = "http://" + r.Host + "/api/playlist?infohash=" + bfdBody.InfoHash
+	for i, bfdbFile := range bfdBody.Files {
 		bfdRes.Files = append(bfdRes.Files, "NOT FOUND")
 		bfdRes.StreamURL = append(bfdRes.StreamURL, "NOT FOUND")
-		for j := 0; j < len(tFiles); j++ {
-			if bfdBody.Files[i] != "" && strings.Contains(strings.ToLower(tFiles[j].DisplayPath()), strings.ToLower(bfdBody.Files[i])) {
-				bfdRes.Files[i] = bfdBody.Files[i]
-				bfdRes.StreamURL[i] = "/api/stream?infohash=" + bfdBody.InfoHash + "&filename=" + url.QueryEscape(bfdBody.Files[i])
-				tFiles[j].Download()
+		for _, tFile := range t.Files() {
+			if bfdbFile != "" && strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(bfdbFile)) {
+				bfdRes.Files[i] = bfdbFile
+				bfdRes.StreamURL[i] = "http://" + r.Host + "/api/stream?infohash=" + bfdBody.InfoHash + "&filename=" + url.QueryEscape(bfdbFile)
+				bfdRes.PlaylistURL += "&file=" + url.QueryEscape(bfdbFile)
+				tFile.Download()
 				break
 			}
 		}
@@ -221,15 +224,14 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get file from query
-	tFiles := t.Files()
-	for i := 0; i < len(tFiles); i++ {
-		if strings.Contains(strings.ToLower(tFiles[i].DisplayPath()), strings.ToLower(fileName[0])) {
-			fileRead := tFiles[i].NewReader()
-			fileRead.SetReadahead(tFiles[i].Length() / 100)
+	for _, tFile := range t.Files() {
+		if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(fileName[0])) {
+			fileRead := tFile.NewReader()
+			fileRead.SetReadahead(tFile.Length() / 100)
 			fileRead.SetResponsive()
-			fileRead.Seek(tFiles[i].Offset(), io.SeekStart)
+			fileRead.Seek(tFile.Offset(), io.SeekStart)
 			w.Header().Set("Content-Disposition", "attachment; filename=\""+t.Info().Name+"\"")
-			http.ServeContent(w, r, tFiles[i].DisplayPath(), time.Now(), fileRead)
+			http.ServeContent(w, r, tFile.DisplayPath(), time.Now(), fileRead)
 			break
 		}
 	}
@@ -291,11 +293,10 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 	var ltRes listTorrentsRes
 
 	// Get infohash of all of the torrents
-	allTorrents := torrentCli.Torrents()
-	for i := 0; i < len(allTorrents); i++ {
+	for _, t := range torrentCli.Torrents() {
 		ltRes.Torrents = append(ltRes.Torrents, listTorrentNameInfoHash{
-			Name:     allTorrents[i].Name(),
-			InfoHash: allTorrents[i].InfoHash().String(),
+			Name:     t.Name(),
+			InfoHash: t.InfoHash().String(),
 		})
 	}
 
@@ -341,8 +342,11 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	var tsRes torrentStatsRes
 	var eRes errorRes
 
+	w.Header().Set("Content-Type", "application/json")
+
 	// Decodes request body to JSON
 	if !ihok {
+		w.WriteHeader(404)
 		eRes.Error = "InfoHash is not provided"
 		json.NewEncoder(w).Encode(&eRes)
 		return
@@ -368,26 +372,60 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	tsRes.PendingPeers = t.Stats().PendingPeers
 
 	// Get files
-	tFiles := t.Files()
-	for i := 0; i < len(tFiles); i++ {
-		fileName := strings.Split(tFiles[i].DisplayPath(), "/")
+	for _, tFile := range t.Files() {
+		fileName := strings.Split(tFile.DisplayPath(), "/")
 		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentStatsFilesOnTorrent{
 			FileName:      fileName[len(fileName)-1],
-			FileSizeBytes: int(tFiles[i].Length()),
+			FileSizeBytes: int(tFile.Length()),
 		})
-		if tFiles[i].BytesCompleted() != 0 {
+		if tFile.BytesCompleted() != 0 {
 			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
 				FileName:        fileName[len(fileName)-1],
-				StreamURL:       "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(fileName[len(fileName)-1]),
-				BytesDownloaded: int(tFiles[i].BytesCompleted()),
-				FileSizeBytes:   int(tFiles[i].Length()),
+				StreamURL:       "http://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(fileName[len(fileName)-1]),
+				BytesDownloaded: int(tFile.BytesCompleted()),
+				FileSizeBytes:   int(tFile.Length()),
 			})
 		}
 	}
 
 	// Send response
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(&tsRes)
+}
+
+func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
+	var eRes errorRes
+	// Get query values
+	infoHash, ihok := r.URL.Query()["infohash"]
+	files, fok := r.URL.Query()["file"]
+
+	// Check presence
+	if !ihok || !fok {
+		w.WriteHeader(404)
+		eRes.Error = "InfoHash or Files not provided"
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Get torrent handler
+	_, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
+
+	// Not found
+	if !tok {
+		w.WriteHeader(404)
+		eRes.Error = "Torrent not found"
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Create M3U file
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+infoHash[0]+".m3u\"")
+	playList := "#EXTM3U\n"
+	for _, file := range files {
+		playList += "#EXTINF:-1," + file + "\n"
+		playList += "http://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&filename=" + url.QueryEscape(file) + "\n"
+	}
+	fmt.Fprint(w, playList)
 }
 
 func main() {
@@ -449,6 +487,7 @@ func main() {
 	mux.HandleFunc("/api/removetorrent", removeTorrent)
 	mux.HandleFunc("/api/torrents", listTorrents)
 	mux.HandleFunc("/api/torrent", torrentStats)
+	mux.HandleFunc("/api/playlist", getFilePlaylist)
 
 	// CORS
 	c := cors.New(cors.Options{

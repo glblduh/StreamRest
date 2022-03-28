@@ -68,6 +68,12 @@ Stops torrent download and deletes its files
 }
 ```
 
+### Get Playlist `(GET)`
+
+Automatically create a playlist file for the selected files
+
+`/api/playlist?infohash="infohash"&file="file1"&file="file2"`
+
 ### List all torrents `(GET)`
 `/api/torrents`
 
