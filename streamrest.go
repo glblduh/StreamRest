@@ -82,7 +82,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		amOFRes.InfoHash = t.InfoHash().String()
 		amOFRes.Name = t.Name()
 		modFileName := strings.Split(t.Files()[0].DisplayPath(), "/")
-		amOFRes.StreamURL = "http://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1])
+		amOFRes.StreamURL = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1])
 		json.NewEncoder(w).Encode(&amOFRes)
 		return
 	}
@@ -91,14 +91,14 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	if len(amBody.Files) > 0 {
 		amSFRes.InfoHash = t.InfoHash().String()
 		amSFRes.Name = t.Name()
-		amSFRes.PlaylistURL = "http://" + r.Host + "/api/playlist?infohash=" + t.InfoHash().String()
+		amSFRes.PlaylistURL = "/api/playlist?infohash=" + t.InfoHash().String()
 
 		// Get file from query
 		for i, ambFile := range amBody.Files {
 			amSFRes.StreamURL = append(amSFRes.StreamURL, "NOT FOUND")
 			for _, tFile := range t.Files() {
 				if ambFile != "" && strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(ambFile)) {
-					amSFRes.StreamURL[i] = "http://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(ambFile)
+					amSFRes.StreamURL[i] = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(ambFile)
 					amSFRes.PlaylistURL += "&file=" + url.QueryEscape(ambFile)
 					tFile.Download()
 					break
@@ -177,14 +177,14 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get file from query
-	bfdRes.PlaylistURL = "http://" + r.Host + "/api/playlist?infohash=" + bfdBody.InfoHash
+	bfdRes.PlaylistURL = "/api/playlist?infohash=" + bfdBody.InfoHash
 	for i, bfdbFile := range bfdBody.Files {
 		bfdRes.Files = append(bfdRes.Files, "NOT FOUND")
 		bfdRes.StreamURL = append(bfdRes.StreamURL, "NOT FOUND")
 		for _, tFile := range t.Files() {
 			if bfdbFile != "" && strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(bfdbFile)) {
 				bfdRes.Files[i] = bfdbFile
-				bfdRes.StreamURL[i] = "http://" + r.Host + "/api/stream?infohash=" + bfdBody.InfoHash + "&filename=" + url.QueryEscape(bfdbFile)
+				bfdRes.StreamURL[i] = "/api/stream?infohash=" + bfdBody.InfoHash + "&filename=" + url.QueryEscape(bfdbFile)
 				bfdRes.PlaylistURL += "&file=" + url.QueryEscape(bfdbFile)
 				tFile.Download()
 				break
@@ -227,6 +227,7 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 	for _, tFile := range t.Files() {
 		if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(fileName[0])) {
 			fileRead := tFile.NewReader()
+			defer fileRead.Close()
 			fileRead.SetReadahead(tFile.Length() / 100)
 			fileRead.SetResponsive()
 			fileRead.Seek(tFile.Offset(), io.SeekStart)
@@ -381,7 +382,7 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 		if tFile.BytesCompleted() != 0 {
 			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
 				FileName:        fileName[len(fileName)-1],
-				StreamURL:       "http://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(fileName[len(fileName)-1]),
+				StreamURL:       "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(fileName[len(fileName)-1]),
 				BytesDownloaded: int(tFile.BytesCompleted()),
 				FileSizeBytes:   int(tFile.Length()),
 			})
@@ -418,6 +419,12 @@ func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check HTTP scheme if behind reverse proxy
+	httpScheme := "http"
+	if r.Header.Get("X-Forwarded-Proto") != "" {
+		httpScheme = r.Header.Get("X-Forwarded-Proto")
+	}
+
 	// Create M3U file
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+infoHash[0]+".m3u\"")
 	playList := "#EXTM3U\n"
@@ -426,7 +433,7 @@ func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
 			modFileName := strings.Split(tFile.DisplayPath(), "/")
 			if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(file)) {
 				playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
-				playList += "http://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+				playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
 				tFile.Download()
 				break
 			}
