@@ -408,7 +408,7 @@ func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get torrent handler
-	_, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
+	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
 	// Not found
 	if !tok {
@@ -422,8 +422,15 @@ func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+infoHash[0]+".m3u\"")
 	playList := "#EXTM3U\n"
 	for _, file := range files {
-		playList += "#EXTINF:-1," + file + "\n"
-		playList += "http://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&filename=" + url.QueryEscape(file) + "\n"
+		for _, tFile := range t.Files() {
+			modFileName := strings.Split(tFile.DisplayPath(), "/")
+			if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(file)) {
+				playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
+				playList += "http://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+				tFile.Download()
+				break
+			}
+		}
 	}
 	fmt.Fprint(w, playList)
 }
