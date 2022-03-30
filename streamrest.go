@@ -82,7 +82,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		amOFRes.InfoHash = t.InfoHash().String()
 		amOFRes.Name = t.Name()
 		modFileName := strings.Split(t.Files()[0].DisplayPath(), "/")
-		amOFRes.StreamURL = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1])
+		amOFRes.StreamURL = "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
 		json.NewEncoder(w).Encode(&amOFRes)
 		return
 	}
@@ -98,7 +98,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 			amSFRes.StreamURL = append(amSFRes.StreamURL, "NOT FOUND")
 			for _, tFile := range t.Files() {
 				if ambFile != "" && strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(ambFile)) {
-					amSFRes.StreamURL[i] = "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(ambFile)
+					amSFRes.StreamURL[i] = "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(ambFile)
 					amSFRes.PlaylistURL += "&file=" + url.QueryEscape(ambFile)
 					tFile.Download()
 					break
@@ -145,11 +145,11 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 	var bfdBody beginFileDownloadBody
 	var bfdRes beginFileDownloadRes
 
+	w.Header().Set("Content-Type", "application/json")
 	// Parse JSON body
 	json.NewDecoder(r.Body).Decode(&bfdBody)
-	if bfdBody.InfoHash == "" || len(bfdBody.Files) < 1 {
+	if bfdBody.InfoHash == "" || !bfdBody.AllFiles && len(bfdBody.Files) < 1 {
 		w.WriteHeader(404)
-		w.Header().Set("Content-Type", "application/json")
 		eRes.Error = "InfoHash or Files is not provided"
 		json.NewEncoder(w).Encode(&eRes)
 		return
@@ -159,7 +159,6 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(bfdBody.InfoHash))
 
 	// Torrent not found
-	w.Header().Set("Content-Type", "application/json")
 	if !tok {
 		w.WriteHeader(404)
 		eRes.Error = "Torrent not found"
@@ -172,6 +171,11 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 		t.DownloadAll()
 		bfdRes.InfoHash = bfdBody.InfoHash
 		bfdRes.AllFiles = bfdBody.AllFiles
+		bfdRes.PlaylistURL = "/api/playlist?infohash=" + bfdBody.InfoHash
+		for _, tFile := range t.Files() {
+			modFileName := strings.Split(tFile.DisplayPath(), "/")
+			bfdRes.PlaylistURL += "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
+		}
 		json.NewEncoder(w).Encode(&bfdRes)
 		return
 	}
@@ -184,7 +188,7 @@ func beginFileDownload(w http.ResponseWriter, r *http.Request) {
 		for _, tFile := range t.Files() {
 			if bfdbFile != "" && strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(bfdbFile)) {
 				bfdRes.Files[i] = bfdbFile
-				bfdRes.StreamURL[i] = "/api/stream?infohash=" + bfdBody.InfoHash + "&filename=" + url.QueryEscape(bfdbFile)
+				bfdRes.StreamURL[i] = "/api/stream?infohash=" + bfdBody.InfoHash + "&file=" + url.QueryEscape(bfdbFile)
 				bfdRes.PlaylistURL += "&file=" + url.QueryEscape(bfdbFile)
 				tFile.Download()
 				break
@@ -201,12 +205,12 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 	var eRes errorRes
 	// Get query values
 	infoHash, ihok := r.URL.Query()["infohash"]
-	fileName, fnok := r.URL.Query()["filename"]
+	fileName, fnok := r.URL.Query()["file"]
 
 	if !ihok || !fnok {
 		w.WriteHeader(404)
 		w.Header().Set("Content-Type", "application/json")
-		eRes.Error = "InfoHash or FileName is not provided"
+		eRes.Error = "InfoHash or File is not provided"
 		json.NewEncoder(w).Encode(&eRes)
 		return
 	}
@@ -382,7 +386,7 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 		if tFile.BytesCompleted() != 0 {
 			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
 				FileName:        fileName[len(fileName)-1],
-				StreamURL:       "/api/stream?infohash=" + t.InfoHash().String() + "&filename=" + url.QueryEscape(fileName[len(fileName)-1]),
+				StreamURL:       "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(fileName[len(fileName)-1]),
 				BytesDownloaded: int(tFile.BytesCompleted()),
 				FileSizeBytes:   int(tFile.Length()),
 			})
@@ -433,7 +437,7 @@ func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
 			modFileName := strings.Split(tFile.DisplayPath(), "/")
 			if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(file)) {
 				playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
-				playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&filename=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+				playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
 				tFile.Download()
 				break
 			}

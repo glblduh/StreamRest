@@ -53,7 +53,7 @@ Initialize file for download
 Streams a file from the **(select a file before streaming)**
 
 ```
-/api/stream?infohash="infohash"&filename="filename"
+/api/stream?infohash="infohash"&file="filename"
 ```
 
 ### Remove torrent `(DELETE)`
