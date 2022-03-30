@@ -230,12 +230,13 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 	// Get file from query
 	for _, tFile := range t.Files() {
 		if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(fileName[0])) {
+			modFileName := strings.Split(tFile.DisplayPath(), "/")
+			w.Header().Set("Content-Disposition", "attachment; filename=\""+modFileName[len(modFileName)-1]+"\"")
 			fileRead := tFile.NewReader()
 			defer fileRead.Close()
 			fileRead.SetReadahead(tFile.Length() / 100)
 			fileRead.SetResponsive()
 			fileRead.Seek(tFile.Offset(), io.SeekStart)
-			w.Header().Set("Content-Disposition", "attachment; filename=\""+t.Info().Name+"\"")
 			http.ServeContent(w, r, tFile.DisplayPath(), time.Now(), fileRead)
 			break
 		}
