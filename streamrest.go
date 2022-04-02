@@ -46,9 +46,9 @@ func main() {
 		// Get current working directory
 		pwd, _ := os.Getwd()
 		// Make streamrest directory if doesn't exist
-		os.MkdirAll(filepath.Join(pwd, "streamrest"), os.ModePerm)
+		os.MkdirAll(filepath.Join(pwd, "srdir"), os.ModePerm)
 		// Set the download directory to streamrest directory
-		tcliConfs.DataDir = filepath.Join(pwd, "streamrest")
+		tcliConfs.DataDir = filepath.Join(pwd, "srdir")
 	} else {
 		// Set download directory to specified directory
 		tcliConfs.DataDir = filepath.Join(dataDir)
