@@ -12,7 +12,7 @@ glbl/streamrest:latest
 ## Compiling
 ```
 go mod download
-go build streamrest.go
+go build -ldflags="-extldflags -static -w -s" -tags=nosqlite
 ```
 
 ## Starting
