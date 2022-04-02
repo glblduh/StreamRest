@@ -28,32 +28,24 @@ Add a torrent to the server
 **Request body**
 ```
 {
-    Magnet: "magnetlink",
-    Files: arrayofpreselectedfiles[]
+    Magnet: "magnetlink"
 }
 ```
 
-### Select file `(POST)`
-`/api/selectfile`
+### Get Playlist `(GET)`
 
-Initialize file for download
+**This is also for starting a stream**
 
-**Request body**
-```
-{
-    InfoHash: "infohash"
-    Files: arrayoffilenames[]
-    AllFiles: false (Set true to download all files)
-}
-```
-
-### Stream file `(GET)`
-`/api/stream`
-
-Streams a file from the **(select a file before streaming)**
+Automatically create a playlist file for the selected files
 
 ```
-/api/stream?infohash="infohash"&file="filename"
+/api/play?infohash="infohash"&file="file1"&file="file2"
+```
+
+To stream all files of torrent
+
+```
+/api/play?infohash="infohash"&file="ALLFILES"
 ```
 
 ### Remove torrent `(DELETE)`
@@ -67,12 +59,6 @@ Stops torrent download and deletes its files
     InfoHash: "infohash"
 }
 ```
-
-### Get Playlist `(GET)`
-
-Automatically create a playlist file for the selected files
-
-`/api/playlist?infohash="infohash"&file="file1"&file="file2"`
 
 ### List all torrents `(GET)`
 `/api/torrents`
