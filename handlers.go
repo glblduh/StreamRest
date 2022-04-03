@@ -61,15 +61,12 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	// If all files are selected
 	if amBody.AllFiles {
 		t.DownloadAll()
-		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
+		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String() + "&file=ALLFILES"
 	}
 
 	// Get all files
 	for _, tFile := range t.Files() {
 		modFileName := strings.Split(tFile.DisplayPath(), "/")
-		if amBody.AllFiles {
-			amRes.PlaylistURL += "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
-		}
 		amRes.Files = append(amRes.Files, addMagnetFiles{
 			FileName:      modFileName[len(modFileName)-1],
 			FileSizeBytes: int(tFile.Length()),
