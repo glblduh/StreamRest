@@ -48,6 +48,14 @@ To stream all files of torrent
 /api/play?infohash="infohash"&file="ALLFILES"
 ```
 
+### Manual stream `(GET)`
+
+**This is not recommended because it doesn't call the download for the file and only supports one file**
+
+```
+/api/stream?infohash="infohash"&file="filename"
+```
+
 ### Remove torrent `(DELETE)`
 `/api/removetorrent`
 
