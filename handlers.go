@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -81,15 +80,14 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 
 	// Get file from query
 	for _, tFile := range t.Files() {
-		if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(fileName[0])) {
-			modFileName := strings.Split(tFile.DisplayPath(), "/")
+		modFileName := strings.Split(tFile.DisplayPath(), "/")
+		if strings.Compare(modFileName[len(modFileName)-1], fileName[0]) == 0 {
 			w.Header().Set("Content-Disposition", "attachment; filename=\""+modFileName[len(modFileName)-1]+"\"")
 			fileRead := tFile.NewReader()
 			defer fileRead.Close()
 			fileRead.SetReadahead(tFile.Length() / 100)
 			fileRead.SetResponsive()
-			fileRead.Seek(tFile.Offset(), io.SeekStart)
-			http.ServeContent(w, r, tFile.DisplayPath(), time.Now(), fileRead)
+			http.ServeContent(w, r, modFileName[len(modFileName)-1], time.Now(), fileRead)
 			break
 		}
 	}
