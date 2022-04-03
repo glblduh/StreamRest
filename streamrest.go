@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -53,11 +53,11 @@ func main() {
 		// Set download directory to specified directory
 		tcliConfs.DataDir = filepath.Join(dataDir)
 	}
-	fmt.Printf("[INFO] Download directory is set to: %s\n", tcliConfs.DataDir)
+	log.Printf("[INFO] Download directory is set to: %s\n", tcliConfs.DataDir)
 
 	// Disable upload if specified
 	if disableUpload {
-		fmt.Println("[INFO] Upload is disabled")
+		log.Println("[INFO] Upload is disabled")
 		tcliConfs.NoUpload = true
 	}
 
@@ -81,6 +81,6 @@ func main() {
 	})
 
 	// Start listening
-	fmt.Printf("[INFO] Listening on http://%s\n", httpHost)
+	log.Printf("[INFO] Listening on http://%s\n", httpHost)
 	http.ListenAndServe(httpHost, c.Handler(mux))
 }

@@ -7,14 +7,16 @@ type errorRes struct {
 // Add magnet structs
 
 type addMagnetBody struct {
-	Magnet string
-	Files  []string
+	Magnet   string
+	AllFiles bool
+	Files    []string
 }
 
 type addMagnetRes struct {
-	InfoHash string
-	Name     string
-	Files    []addMagnetFiles
+	InfoHash    string
+	Name        string
+	PlaylistURL string
+	Files       []addMagnetFiles
 }
 
 type addMagnetFiles struct {

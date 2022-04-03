@@ -29,6 +29,10 @@ Add a torrent to the server
 ```
 {
     Magnet: "magnetlink"
+
+    // Below are optional parameters
+    AllFiles: false // Set to true to download all files in torrent without opening a stream
+    Files: ["file1", "file2"] // Download selected file/s without opening a stream
 }
 ```
 

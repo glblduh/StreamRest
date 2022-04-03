@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,9 +38,38 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	amRes.InfoHash = t.InfoHash().String()
 	amRes.Name = t.Name()
 
+	// If selected files
+	if len(amBody.Files) > 0 {
+		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
+		for _, selFile := range amBody.Files {
+			for _, tFile := range t.Files() {
+				modFileName := strings.Split(tFile.DisplayPath(), "/")
+				if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(selFile)) {
+					amRes.PlaylistURL += "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
+					amRes.Files = append(amRes.Files, addMagnetFiles{
+						FileName:      modFileName[len(modFileName)-1],
+						FileSizeBytes: int(tFile.Length()),
+					})
+					break
+				}
+			}
+		}
+		json.NewEncoder(w).Encode(&amRes)
+		return
+	}
+
+	// If all files are selected
+	if amBody.AllFiles {
+		t.DownloadAll()
+		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
+	}
+
 	// Get all files
 	for _, tFile := range t.Files() {
 		modFileName := strings.Split(tFile.DisplayPath(), "/")
+		if amBody.AllFiles {
+			amRes.PlaylistURL += "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
+		}
 		amRes.Files = append(amRes.Files, addMagnetFiles{
 			FileName:      modFileName[len(modFileName)-1],
 			FileSizeBytes: int(tFile.Length()),
@@ -252,7 +280,7 @@ func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
 			playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
 			playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
 		}
-		fmt.Fprint(w, playList)
+		w.Write([]byte(playList))
 		return
 	}
 
@@ -267,5 +295,5 @@ func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	fmt.Fprint(w, playList)
+	w.Write([]byte(playList))
 }
