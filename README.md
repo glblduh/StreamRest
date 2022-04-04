@@ -20,7 +20,7 @@ go build -ldflags="-extldflags -static -w -s" -tags=nosqlite
 
 ## Endpoints
 
-### Add Magnet `(POST)`
+### Add Magnet
 `/api/addmagnet`
 
 Add a torrent to the server
@@ -36,7 +36,7 @@ Add a torrent to the server
 }
 ```
 
-### Get Playlist `(GET)`
+### Get Playlist
 
 **This is also for starting a stream**
 
@@ -62,7 +62,7 @@ This endpoint automatically adds the magnet and send a playlist of the files
 /api/playmagnet?magnet="magnetlink"&file="file1"&file="file2"
 ```
 
-### Manual stream `(GET)`
+### Manual stream
 
 **This is not recommended because it doesn't call the download for the file and only supports one file**
 
@@ -70,7 +70,7 @@ This endpoint automatically adds the magnet and send a playlist of the files
 /api/stream?infohash="infohash"&file="filename"
 ```
 
-### Remove torrent `(DELETE)`
+### Remove torrent
 `/api/removetorrent`
 
 Stops torrent download and deletes its files
@@ -82,12 +82,12 @@ Stops torrent download and deletes its files
 }
 ```
 
-### List all torrents `(GET)`
+### List all torrents
 `/api/torrents`
 
 A array of infohash of all active torrents
 
-### Get Torrent info `(GET)`
+### Get Torrent info
 `/api/torrent`
 
 Get info about the torrent
