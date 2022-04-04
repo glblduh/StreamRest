@@ -262,7 +262,17 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	// If infohash is provided
 	if ihOk && !magOk && !dnOk && !trOk {
-		t, _ = torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
+		var tOk bool
+		t, tOk = torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
+
+		// If infohash is not found
+		if !tOk {
+			w.WriteHeader(404)
+			json.NewEncoder(w).Encode(errorRes{
+				Error: "Torrent not found",
+			})
+			return
+		}
 	}
 
 	// If the magnet is not escaped
