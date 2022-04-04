@@ -315,9 +315,11 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get infohash from magnet
-	magnetSplit := strings.Split(magnet[0], ":")
-	torrentSpec.InfoHash = metainfo.NewHashFromHex(magnetSplit[len(magnetSplit)-1])
+	if dnOk || trOk {
+		// Get infohash from magnet
+		magnetSplit := strings.Split(magnet[0], ":")
+		torrentSpec.InfoHash = metainfo.NewHashFromHex(magnetSplit[len(magnetSplit)-1])
+	}
 
 	// Set display name if present
 	if dnOk {
@@ -332,8 +334,13 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var t *torrent.Torrent
 	// Add torrent spec to client
-	t, _, _ := torrentCli.AddTorrentSpec(&torrentSpec)
+	if !dnOk && !trOk {
+		t, _ = torrentCli.AddMagnet(magnet[0])
+	} else {
+		t, _, _ = torrentCli.AddTorrentSpec(&torrentSpec)
+	}
 	<-t.GotInfo()
 
 	// Check if no selected file

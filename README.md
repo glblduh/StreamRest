@@ -54,8 +54,6 @@ To stream all files of torrent
 
 ### Play magnet
 
-**Do not escape the magnet link when adding to this because the endpoint checks for the `dn` and `tr` queries in the URL**
-
 This endpoint automatically adds the magnet and send a playlist of the files
 
 ```
