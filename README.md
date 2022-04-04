@@ -52,6 +52,16 @@ To stream all files of torrent
 /api/play?infohash="infohash"&file="ALLFILES"
 ```
 
+### Play magnet
+
+**Do not escape the magnet link when adding to this because the endpoint checks for the `dn` and `tr` queries in the URL**
+
+This endpoint automatically adds the magnet and send a playlist of the files
+
+```
+/api/playmagnet?magnet="magnetlink"&file="file1"&file="file2"
+```
+
 ### Manual stream `(GET)`
 
 **This is not recommended because it doesn't call the download for the file and only supports one file**

@@ -72,6 +72,7 @@ func main() {
 	mux.HandleFunc("/api/torrents", listTorrents)
 	mux.HandleFunc("/api/torrent", torrentStats)
 	mux.HandleFunc("/api/play", getFilePlaylist)
+	mux.HandleFunc("/api/playmagnet", playMagnet)
 
 	// CORS
 	c := cors.New(cors.Options{

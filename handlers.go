@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 )
 
@@ -287,6 +288,104 @@ func getFilePlaylist(w http.ResponseWriter, r *http.Request) {
 			if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(file)) {
 				playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
 				playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + infoHash[0] + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+				tFile.Download()
+				break
+			}
+		}
+	}
+	w.Write([]byte(playList))
+}
+
+func playMagnet(w http.ResponseWriter, r *http.Request) {
+	// Needed variables
+	torrentSpec := torrent.TorrentSpec{}
+	magnet, magOk := r.URL.Query()["magnet"]
+	displayName, dnOk := r.URL.Query()["dn"]
+	trackers, trOk := r.URL.Query()["tr"]
+	files, fOk := r.URL.Query()["file"]
+
+	// Check if provided with magnet
+	if !magOk {
+		eRes := errorRes{
+			Error: "Magnet link not provided",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(404)
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Get infohash from magnet
+	magnetSplit := strings.Split(magnet[0], ":")
+	torrentSpec.InfoHash = metainfo.NewHashFromHex(magnetSplit[len(magnetSplit)-1])
+
+	// Set display name if present
+	if dnOk {
+		torrentSpec.DisplayName = displayName[0]
+	}
+
+	// Set custom trackers if present
+	if trOk {
+		for i, tracker := range trackers {
+			torrentSpec.Trackers = append(torrentSpec.Trackers, []string{})
+			torrentSpec.Trackers[i] = append(torrentSpec.Trackers[i], tracker)
+		}
+	}
+
+	// Add torrent spec to client
+	t, _, _ := torrentCli.AddTorrentSpec(&torrentSpec)
+	<-t.GotInfo()
+
+	// Check if no selected file
+	if t.Info().IsDir() && !fOk {
+		eRes := errorRes{
+			Error: "No selected files",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(404)
+		json.NewEncoder(w).Encode(&eRes)
+		return
+	}
+
+	// Create playlist file
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+t.InfoHash().String()+".m3u\"")
+	playList := "#EXTM3U\n"
+
+	// Check HTTP scheme if behind reverse proxy
+	httpScheme := "http"
+	if r.Header.Get("X-Forwarded-Proto") != "" {
+		httpScheme = r.Header.Get("X-Forwarded-Proto")
+	}
+
+	// If only one file
+	if !t.Info().IsDir() {
+		tFile := t.Files()[0]
+		tFile.Download()
+		modFileName := strings.Split(tFile.DisplayPath(), "/")
+		playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
+		playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+		w.Write([]byte(playList))
+		return
+	}
+
+	// If all files are selected
+	if strings.Compare(files[0], "ALLFILES") == 0 {
+		t.DownloadAll()
+		for _, tFile := range t.Files() {
+			modFileName := strings.Split(tFile.DisplayPath(), "/")
+			playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
+			playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+		}
+		w.Write([]byte(playList))
+		return
+	}
+
+	for _, file := range files {
+		for _, tFile := range t.Files() {
+			modFileName := strings.Split(tFile.DisplayPath(), "/")
+			if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(file)) {
+				playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
+				playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
 				tFile.Download()
 				break
 			}
