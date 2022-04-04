@@ -62,7 +62,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	// If all files are selected
 	if amBody.AllFiles {
 		t.DownloadAll()
-		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String() + "&file=ALLFILES"
+		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
 	}
 
 	// Get all files
@@ -292,17 +292,6 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	<-t.GotInfo()
 
-	// Check if no selected file
-	if t.Info().IsDir() && !fOk {
-		eRes := errorRes{
-			Error: "No selected files",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(&eRes)
-		return
-	}
-
 	// Create playlist file
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+t.InfoHash().String()+".m3u\"")
 	playList := "#EXTM3U\n"
@@ -324,8 +313,8 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If all files are selected
-	if strings.Compare(files[0], "ALLFILES") == 0 {
+	// If no files are selected
+	if t.Info().IsDir() && !fOk {
 		t.DownloadAll()
 		for _, tFile := range t.Files() {
 			modFileName := strings.Split(tFile.DisplayPath(), "/")

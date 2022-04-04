@@ -46,19 +46,22 @@ Automatically create a playlist file for the selected files
 /api/play?infohash="infohash"&file="file1"&file="file2"
 ```
 
-To stream all files of torrent
-
-```
-/api/play?infohash="infohash"&file="ALLFILES"
-```
-
-### Play magnet
-
-This endpoint automatically adds the magnet and send a playlist of the files
+To play a magnet link directly
 
 ```
 /api/playmagnet?magnet="magnetlink"&file="file1"&file="file2"
 ```
+
+To stream all files of torrent
+
+```
+/api/play?infohash="infohash"
+
+or
+
+/api/play?magnet="magnetlink"
+```
+
 
 ### Manual stream
 
