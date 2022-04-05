@@ -13,26 +13,40 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 )
 
+func httpJSONError(w http.ResponseWriter, error string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	if json.NewEncoder(w).Encode(errorRes{
+		Error: error,
+	}) != nil {
+		http.Error(w, error, code)
+	}
+}
+
 func addMagnet(w http.ResponseWriter, r *http.Request) {
 	// Variables for JSON request body and response
 	var amBody addMagnetBody
 	var amRes addMagnetRes
-	var eRes errorRes
 
 	// Decode JSON of request body and set response Content-Type to JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewDecoder(r.Body).Decode(&amBody)
+	if json.NewDecoder(r.Body).Decode(&amBody) != nil {
+		httpJSONError(w, "Request JSON body decode error", http.StatusInternalServerError)
+		return
+	}
 
 	// Response error if parameters are not given
 	if amBody.Magnet == "" {
-		eRes.Error = "Magnet is not provided"
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(&eRes)
+		httpJSONError(w, "Magnet link is not provided", http.StatusNotFound)
 		return
 	}
 
 	// Add magnet to torrent client
-	t, _ := torrentCli.AddMagnet(amBody.Magnet)
+	t, magErr := torrentCli.AddMagnet(amBody.Magnet)
+	if magErr != nil {
+		httpJSONError(w, "AddMagnet error", http.StatusInternalServerError)
+		return
+	}
 	<-t.GotInfo()
 
 	// Make response
@@ -55,7 +69,10 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		json.NewEncoder(w).Encode(&amRes)
+		if json.NewEncoder(w).Encode(&amRes) != nil {
+			httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 
@@ -75,32 +92,32 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send response
-	json.NewEncoder(w).Encode(&amRes)
+	if json.NewEncoder(w).Encode(&amRes) != nil {
+		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func beginStream(w http.ResponseWriter, r *http.Request) {
-	var eRes errorRes
 	// Get query values
 	infoHash, ihok := r.URL.Query()["infohash"]
 	fileName, fnok := r.URL.Query()["file"]
 
 	if !ihok || !fnok {
-		w.WriteHeader(404)
-		w.Header().Set("Content-Type", "application/json")
-		eRes.Error = "InfoHash or File is not provided"
-		json.NewEncoder(w).Encode(&eRes)
+		httpJSONError(w, "InfoHash or File is not provided", http.StatusNotFound)
 		return
 	}
 
 	// Get torrent handler
+	if len(infoHash[0]) != 40 {
+		httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
+		return
+	}
 	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
 	// Torrent not found
 	if !tok {
-		w.WriteHeader(404)
-		w.Header().Set("Content-Type", "application/json")
-		eRes.Error = "Torrent not found"
-		json.NewEncoder(w).Encode(&eRes)
+		httpJSONError(w, "Torrent not found", http.StatusNotFound)
 		return
 	}
 
@@ -122,28 +139,30 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	// Vars for request and response
 	var rtBodyRes removeTorrentBodyRes
-	var eRes errorRes
 
 	// Decode JSON of request body and set response Content-Type to JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewDecoder(r.Body).Decode(&rtBodyRes)
+	if json.NewDecoder(r.Body).Decode(&rtBodyRes) != nil {
+		httpJSONError(w, "Request JSON body decode error", http.StatusInternalServerError)
+		return
+	}
 
 	// Response error if parameters are not given
 	if rtBodyRes.InfoHash == "" {
-		eRes.Error = "InfoHash is not provided"
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(&eRes)
+		httpJSONError(w, "InfoHash is not provided", http.StatusNotFound)
 		return
 	}
 
 	// Find torrent
+	if len(rtBodyRes.InfoHash) != 40 {
+		httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
+		return
+	}
 	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(rtBodyRes.InfoHash))
 
 	// Torrent not found
 	if !tok {
-		w.WriteHeader(404)
-		eRes.Error = "Torrent not found"
-		json.NewEncoder(w).Encode(&eRes)
+		httpJSONError(w, "Torrent is not found", http.StatusNotFound)
 		return
 	}
 
@@ -151,10 +170,16 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	t.Drop()
 
 	// Deletes files
-	os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name()))
+	if os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name())) != nil {
+		httpJSONError(w, "RemoveAll error", http.StatusInternalServerError)
+		return
+	}
 
 	// Send request body as response
-	json.NewEncoder(w).Encode(&rtBodyRes)
+	if json.NewEncoder(w).Encode(&rtBodyRes) != nil {
+		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func listTorrents(w http.ResponseWriter, r *http.Request) {
@@ -175,33 +200,35 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(&ltRes)
+	if json.NewEncoder(w).Encode(&ltRes) != nil {
+		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func torrentStats(w http.ResponseWriter, r *http.Request) {
 	// Vars for request body and response
 	infoHash, ihok := r.URL.Query()["infohash"]
 	var tsRes torrentStatsRes
-	var eRes errorRes
 
 	w.Header().Set("Content-Type", "application/json")
 
 	// Decodes request body to JSON
 	if !ihok {
-		w.WriteHeader(404)
-		eRes.Error = "InfoHash is not provided"
-		json.NewEncoder(w).Encode(&eRes)
+		httpJSONError(w, "InfoHash is not provided", http.StatusNotFound)
 		return
 	}
 
 	// Get torrent handler
+	if len(infoHash[0]) != 40 {
+		httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
+		return
+	}
 	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
 	// Not found
 	if !tok {
-		w.WriteHeader(404)
-		eRes.Error = "Torrent not found"
-		json.NewEncoder(w).Encode(&eRes)
+		httpJSONError(w, "Torrent is not found", http.StatusNotFound)
 		return
 	}
 
@@ -231,7 +258,10 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send response
-	json.NewEncoder(w).Encode(&tsRes)
+	if json.NewEncoder(w).Encode(&tsRes) != nil {
+		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func playMagnet(w http.ResponseWriter, r *http.Request) {
@@ -244,12 +274,7 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	// Check if provided with magnet
 	if !magOk && !ihOk {
-		eRes := errorRes{
-			Error: "Magnet link or InfoHash is not provided",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(&eRes)
+		httpJSONError(w, "Magnet link or InfoHash is not provided", http.StatusNotFound)
 		return
 	}
 
@@ -257,20 +282,27 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	// If the magnet is escaped
 	if magOk && !dnOk && !trOk && !ihOk {
-		t, _ = torrentCli.AddMagnet(magnet[0])
+		var magErr error
+		t, magErr = torrentCli.AddMagnet(magnet[0])
+		if magErr != nil {
+			httpJSONError(w, "AddMagnet error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// If infohash is provided
 	if ihOk && !magOk && !dnOk && !trOk {
+		if len(infoHash[0]) != 40 {
+			httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
+			return
+		}
+
 		var tOk bool
 		t, tOk = torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
 		// If infohash is not found
 		if !tOk {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(errorRes{
-				Error: "Torrent not found",
-			})
+			httpJSONError(w, "Torrent is not found", http.StatusNotFound)
 			return
 		}
 	}
@@ -297,7 +329,12 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Add torrent spec
-		t, _, _ = torrentCli.AddTorrentSpec(&torrentSpec)
+		var atsErr error
+		t, _, atsErr = torrentCli.AddTorrentSpec(&torrentSpec)
+		if atsErr != nil {
+			httpJSONError(w, "AddTorrentSpec error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	<-t.GotInfo()

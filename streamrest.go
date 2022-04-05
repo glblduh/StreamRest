@@ -46,7 +46,9 @@ func main() {
 		// Get current working directory
 		pwd, _ := os.Getwd()
 		// Make streamrest directory if doesn't exist
-		os.MkdirAll(filepath.Join(pwd, "srdir"), os.ModePerm)
+		if os.MkdirAll(filepath.Join(pwd, "srdir"), os.ModePerm) != nil {
+			log.Fatalln("[ERROR] Creation of download directory failed")
+		}
 		// Set the download directory to streamrest directory
 		tcliConfs.DataDir = filepath.Join(pwd, "srdir")
 	} else {
@@ -62,7 +64,11 @@ func main() {
 	}
 
 	// Make the torrent client
-	torrentCli, _ = torrent.NewClient(tcliConfs)
+	var tCliErr error
+	torrentCli, tCliErr = torrent.NewClient(tcliConfs)
+	if tCliErr != nil {
+		log.Fatalln("[ERROR] Creation of TorrentClient failed")
+	}
 
 	// HTTP Endpoints
 	mux := http.NewServeMux()
@@ -82,5 +88,5 @@ func main() {
 
 	// Start listening
 	log.Printf("[INFO] Listening on http://%s\n", httpHost)
-	http.ListenAndServe(httpHost, c.Handler(mux))
+	log.Fatalln(http.ListenAndServe(httpHost, c.Handler(mux)))
 }
