@@ -4,7 +4,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/anacrolix/torrent"
 	"github.com/rs/cors"
@@ -14,6 +16,22 @@ var torrentCli *torrent.Client
 var tcliConfs *torrent.ClientConfig
 
 func main() {
+	// Remove all torrent upon termination
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		log.Println("[INFO] Termination detected. Removing torrents")
+		for _, t := range torrentCli.Torrents() {
+			log.Printf("[INFO] Removing torrent: %s\n", t.Name())
+			t.Drop()
+			if os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name())) != nil {
+				log.Printf("[ERROR] Failed to remove files of torrent: %s\n", t.Name())
+			}
+		}
+		os.Exit(0)
+	}()
+
 	// Vars
 	httpHost := ":1010"
 	dataDir := ""
@@ -44,7 +62,10 @@ func main() {
 
 	if dataDir == "" {
 		// Get current working directory
-		pwd, _ := os.Getwd()
+		pwd, pwdErr := os.Getwd()
+		if pwdErr != nil {
+			log.Fatalln("[ERROR] Cannot get working directory")
+		}
 		// Make streamrest directory if doesn't exist
 		if os.MkdirAll(filepath.Join(pwd, "srdir"), os.ModePerm) != nil {
 			log.Fatalln("[ERROR] Creation of download directory failed")

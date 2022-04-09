@@ -166,7 +166,7 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 
 		// If torrent doesn't exist
 		if !tok {
-			rtBodyRes.InfoHash[i] = "NOTFOUND"
+			rtBodyRes.InfoHash[i] = "TORRENTNOTFOUND"
 			continue
 		}
 
