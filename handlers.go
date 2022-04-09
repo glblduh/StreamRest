@@ -60,6 +60,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 			for _, tFile := range t.Files() {
 				modFileName := strings.Split(tFile.DisplayPath(), "/")
 				if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(selFile)) {
+					tFile.Download()
 					amRes.PlaylistURL += "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
 					amRes.Files = append(amRes.Files, addMagnetFiles{
 						FileName:      modFileName[len(modFileName)-1],
@@ -148,31 +149,32 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Response error if parameters are not given
-	if rtBodyRes.InfoHash == "" {
-		httpJSONError(w, "InfoHash is not provided", http.StatusNotFound)
+	if len(rtBodyRes.InfoHash) < 1 {
+		httpJSONError(w, "No InfoHash provided", http.StatusNotFound)
 		return
 	}
 
-	// Find torrent
-	if len(rtBodyRes.InfoHash) != 40 {
-		httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
-		return
-	}
-	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(rtBodyRes.InfoHash))
+	// Get all infohashes provided
+	for i, curih := range rtBodyRes.InfoHash {
+		// If infohash is not 40 characters
+		if len(curih) != 40 {
+			rtBodyRes.InfoHash[i] = "INVALIDINFOHASH"
+			continue
+		}
 
-	// Torrent not found
-	if !tok {
-		httpJSONError(w, "Torrent is not found", http.StatusNotFound)
-		return
-	}
+		t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(curih))
 
-	// Drop from torrent client
-	t.Drop()
+		// If torrent doesn't exist
+		if !tok {
+			rtBodyRes.InfoHash[i] = "NOTFOUND"
+			continue
+		}
 
-	// Deletes files
-	if os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name())) != nil {
-		httpJSONError(w, "RemoveAll error", http.StatusInternalServerError)
-		return
+		// Removal
+		t.Drop()
+		if os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name())) != nil {
+			rtBodyRes.InfoHash[i] = "FILEREMOVALERROR"
+		}
 	}
 
 	// Send request body as response

@@ -27,7 +27,7 @@ type addMagnetFiles struct {
 // Remove torrent struct
 
 type removeTorrentBodyRes struct {
-	InfoHash string
+	InfoHash []string
 }
 
 // List torrents structs
