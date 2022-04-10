@@ -20,22 +20,6 @@ go build -ldflags="-extldflags -static -w -s" -tags=nosqlite
 
 ## Endpoints
 
-### Add Magnet
-`/api/addmagnet`
-
-Add a torrent to the server
-
-**Request body**
-```
-{
-    Magnet: "magnetlink"
-
-    // Below are optional parameters
-    AllFiles: false // Set to true to download all files in torrent without opening a stream
-    Files: ["file1", "file2"] // Download selected file/s without opening a stream
-}
-```
-
 ### Get Playlist
 
 **This is also for starting a stream**
@@ -62,6 +46,19 @@ or
 /api/play?magnet="magnetlink"
 ```
 
+### Add Magnet
+`/api/addmagnet`
+
+Start a torrent download without opening a stream
+
+**Request body**
+```
+{
+    Magnet: "magnetlink"
+    Files: ["file1", "file2"] // Download selected file/s. If torrent only has one file it automatically starts the download
+    AllFiles: false // Set to true to download all files in the torrent
+}
+```
 
 ### Manual stream
 

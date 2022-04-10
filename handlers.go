@@ -49,9 +49,50 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	}
 	<-t.GotInfo()
 
+	if t.Info().IsDir() && !amBody.AllFiles && len(amBody.Files) < 1 {
+		t.Drop()
+		httpJSONError(w, "No file/s provided", http.StatusNotFound)
+		return
+	}
+
 	// Make response
 	amRes.InfoHash = t.InfoHash().String()
 	amRes.Name = t.Name()
+
+	// If only one file
+	if !t.Info().IsDir() {
+		tFile := t.Files()[0]
+		tFile.Download()
+		modFileName := strings.Split(tFile.DisplayPath(), "/")
+		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
+		amRes.Files = append(amRes.Files, addMagnetFiles{
+			FileName:      modFileName[len(modFileName)-1],
+			FileSizeBytes: int(tFile.Length()),
+		})
+		if json.NewEncoder(w).Encode(&amRes) != nil {
+			httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
+	// If all files are selected
+	if amBody.AllFiles {
+		t.DownloadAll()
+		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
+		for _, tFile := range t.Files() {
+			modFileName := strings.Split(tFile.DisplayPath(), "/")
+			amRes.Files = append(amRes.Files, addMagnetFiles{
+				FileName:      modFileName[len(modFileName)-1],
+				FileSizeBytes: int(tFile.Length()),
+			})
+		}
+		if json.NewEncoder(w).Encode(&amRes) != nil {
+			httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+			return
+		}
+		return
+	}
 
 	// If selected files
 	if len(amBody.Files) > 0 {
@@ -77,26 +118,6 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If all files are selected
-	if amBody.AllFiles {
-		t.DownloadAll()
-		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
-	}
-
-	// Get all files
-	for _, tFile := range t.Files() {
-		modFileName := strings.Split(tFile.DisplayPath(), "/")
-		amRes.Files = append(amRes.Files, addMagnetFiles{
-			FileName:      modFileName[len(modFileName)-1],
-			FileSizeBytes: int(tFile.Length()),
-		})
-	}
-
-	// Send response
-	if json.NewEncoder(w).Encode(&amRes) != nil {
-		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
-		return
-	}
 }
 
 func beginStream(w http.ResponseWriter, r *http.Request) {
