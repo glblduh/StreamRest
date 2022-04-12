@@ -63,10 +63,9 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	if !t.Info().IsDir() {
 		tFile := t.Files()[0]
 		tFile.Download()
-		modFileName := strings.Split(tFile.DisplayPath(), "/")
-		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
+		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath())
 		amRes.Files = append(amRes.Files, addMagnetFiles{
-			FileName:      modFileName[len(modFileName)-1],
+			FileName:      tFile.DisplayPath(),
 			FileSizeBytes: int(tFile.Length()),
 		})
 		if json.NewEncoder(w).Encode(&amRes) != nil {
@@ -81,9 +80,8 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		t.DownloadAll()
 		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
 		for _, tFile := range t.Files() {
-			modFileName := strings.Split(tFile.DisplayPath(), "/")
 			amRes.Files = append(amRes.Files, addMagnetFiles{
-				FileName:      modFileName[len(modFileName)-1],
+				FileName:      tFile.DisplayPath(),
 				FileSizeBytes: int(tFile.Length()),
 			})
 		}
@@ -99,12 +97,11 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
 		for _, selFile := range amBody.Files {
 			for _, tFile := range t.Files() {
-				modFileName := strings.Split(tFile.DisplayPath(), "/")
-				if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(selFile)) {
+				if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(selFile)) {
 					tFile.Download()
-					amRes.PlaylistURL += "&file=" + url.QueryEscape(modFileName[len(modFileName)-1])
+					amRes.PlaylistURL += "&file=" + url.QueryEscape(tFile.DisplayPath())
 					amRes.Files = append(amRes.Files, addMagnetFiles{
-						FileName:      modFileName[len(modFileName)-1],
+						FileName:      tFile.DisplayPath(),
 						FileSizeBytes: int(tFile.Length()),
 					})
 					break
@@ -145,14 +142,13 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 
 	// Get file from query
 	for _, tFile := range t.Files() {
-		modFileName := strings.Split(tFile.DisplayPath(), "/")
-		if strings.Compare(modFileName[len(modFileName)-1], fileName[0]) == 0 {
-			w.Header().Set("Content-Disposition", "attachment; filename=\""+modFileName[len(modFileName)-1]+"\"")
+		if strings.Compare(tFile.DisplayPath(), fileName[0]) == 0 {
+			w.Header().Set("Content-Disposition", "attachment; filename=\""+tFile.DisplayPath()+"\"")
 			fileRead := tFile.NewReader()
 			defer fileRead.Close()
 			fileRead.SetReadahead(tFile.Length() / 100)
 			fileRead.SetResponsive()
-			http.ServeContent(w, r, modFileName[len(modFileName)-1], time.Now(), fileRead)
+			http.ServeContent(w, r, tFile.DisplayPath(), time.Now(), fileRead)
 			break
 		}
 	}
@@ -265,15 +261,14 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 
 	// Get files
 	for _, tFile := range t.Files() {
-		fileName := strings.Split(tFile.DisplayPath(), "/")
 		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentStatsFilesOnTorrent{
-			FileName:      fileName[len(fileName)-1],
+			FileName:      tFile.DisplayPath(),
 			FileSizeBytes: int(tFile.Length()),
 		})
 		if tFile.BytesCompleted() != 0 {
 			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
-				FileName:        fileName[len(fileName)-1],
-				StreamURL:       "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(fileName[len(fileName)-1]),
+				FileName:        tFile.DisplayPath(),
+				StreamURL:       "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath()),
 				BytesDownloaded: int(tFile.BytesCompleted()),
 				FileSizeBytes:   int(tFile.Length()),
 			})
@@ -376,9 +371,8 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 	if !t.Info().IsDir() {
 		tFile := t.Files()[0]
 		tFile.Download()
-		modFileName := strings.Split(tFile.DisplayPath(), "/")
-		playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
-		playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+		playList += "#EXTINF:-1," + tFile.DisplayPath() + "\n"
+		playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath()) + "\n"
 		w.Write([]byte(playList))
 		return
 	}
@@ -387,9 +381,8 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 	if t.Info().IsDir() && !fOk {
 		t.DownloadAll()
 		for _, tFile := range t.Files() {
-			modFileName := strings.Split(tFile.DisplayPath(), "/")
-			playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
-			playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+			playList += "#EXTINF:-1," + tFile.DisplayPath() + "\n"
+			playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath()) + "\n"
 		}
 		w.Write([]byte(playList))
 		return
@@ -397,10 +390,9 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	for _, file := range files {
 		for _, tFile := range t.Files() {
-			modFileName := strings.Split(tFile.DisplayPath(), "/")
-			if strings.Contains(strings.ToLower(modFileName[len(modFileName)-1]), strings.ToLower(file)) {
-				playList += "#EXTINF:-1," + modFileName[len(modFileName)-1] + "\n"
-				playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(modFileName[len(modFileName)-1]) + "\n"
+			if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(file)) {
+				playList += "#EXTINF:-1," + tFile.DisplayPath() + "\n"
+				playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath()) + "\n"
 				tFile.Download()
 				break
 			}
