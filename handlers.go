@@ -143,7 +143,7 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 	// Get file from query
 	for _, tFile := range t.Files() {
 		if strings.Compare(tFile.DisplayPath(), fileName[0]) == 0 {
-			w.Header().Set("Content-Disposition", "attachment; filename=\""+tFile.DisplayPath()+"\"")
+			w.Header().Set("Content-Disposition", "attachment; filename=\""+safenDisplayPath(tFile.DisplayPath())+"\"")
 			fileRead := tFile.NewReader()
 			defer fileRead.Close()
 			fileRead.SetReadahead(tFile.Length() / 100)
@@ -370,8 +370,7 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 	if !t.Info().IsDir() {
 		tFile := t.Files()[0]
 		tFile.Download()
-		playList += "#EXTINF:-1," + tFile.DisplayPath() + "\n"
-		playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath()) + "\n"
+		playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
 		w.Write([]byte(playList))
 		return
 	}
@@ -380,8 +379,7 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 	if t.Info().IsDir() && !fOk {
 		t.DownloadAll()
 		for _, tFile := range t.Files() {
-			playList += "#EXTINF:-1," + tFile.DisplayPath() + "\n"
-			playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath()) + "\n"
+			playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
 		}
 		w.Write([]byte(playList))
 		return
@@ -390,8 +388,7 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 	for _, file := range files {
 		for _, tFile := range t.Files() {
 			if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(file)) {
-				playList += "#EXTINF:-1," + tFile.DisplayPath() + "\n"
-				playList += httpScheme + "://" + r.Host + "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath()) + "\n"
+				playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
 				tFile.Download()
 				break
 			}
