@@ -23,10 +23,11 @@ func main() {
 		<-sigs
 		log.Println("[INFO] Termination detected. Removing torrents")
 		for _, t := range torrentCli.Torrents() {
-			log.Printf("[INFO] Removing torrent: %s\n", t.Name())
+			log.Printf("[INFO] Removing torrent: [%s]\n", t.Name())
 			t.Drop()
-			if os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name())) != nil {
-				log.Printf("[ERROR] Failed to remove files of torrent: %s\n", t.Name())
+			rmaErr := os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name()))
+			if rmaErr != nil {
+				log.Printf("[ERROR] Failed to remove files of torrent: [%s]: %s\n", t.Name(), rmaErr)
 			}
 		}
 		os.Exit(0)
@@ -64,11 +65,12 @@ func main() {
 		// Get current working directory
 		pwd, pwdErr := os.Getwd()
 		if pwdErr != nil {
-			log.Fatalln("[ERROR] Cannot get working directory")
+			log.Fatalf("[ERROR] Cannot get working directory: %s\n", pwdErr)
 		}
 		// Make streamrest directory if doesn't exist
-		if os.MkdirAll(filepath.Join(pwd, "srdir"), os.ModePerm) != nil {
-			log.Fatalln("[ERROR] Creation of download directory failed")
+		mkaErr := os.MkdirAll(filepath.Join(pwd, "srdir"), os.ModePerm)
+		if mkaErr != nil {
+			log.Fatalf("[ERROR] Creation of download directory failed: %s\n", mkaErr)
 		}
 		// Set the download directory to streamrest directory
 		tcliConfs.DataDir = filepath.Join(pwd, "srdir")
@@ -88,7 +90,7 @@ func main() {
 	var tCliErr error
 	torrentCli, tCliErr = torrent.NewClient(tcliConfs)
 	if tCliErr != nil {
-		log.Fatalln("[ERROR] Creation of TorrentClient failed")
+		log.Fatalf("[ERROR] Creation of TorrentClient failed: %s\n", tCliErr)
 	}
 
 	// HTTP Endpoints
