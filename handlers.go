@@ -147,7 +147,6 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 			fileRead := tFile.NewReader()
 			defer fileRead.Close()
 			fileRead.SetReadahead(tFile.Length() / 100)
-			fileRead.SetResponsive()
 			http.ServeContent(w, r, tFile.DisplayPath(), time.Now(), fileRead)
 			break
 		}
