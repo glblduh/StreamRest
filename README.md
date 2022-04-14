@@ -25,6 +25,7 @@ go build -ldflags="-extldflags -static -w -s" -tags=nosqlite
 **This is also for starting a stream**
 
 Automatically create a playlist file for the selected files
+
 *For specific directory it is seperated by `/` like `directory/file`*
 
 ```
@@ -51,6 +52,7 @@ or
 `/api/addmagnet`
 
 Start a torrent download without opening a stream
+
 *For specific directory it is seperated by `/` like `directory/file`*
 
 **Request body**
