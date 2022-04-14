@@ -25,15 +25,16 @@ go build -ldflags="-extldflags -static -w -s" -tags=nosqlite
 **This is also for starting a stream**
 
 Automatically create a playlist file for the selected files
+*For specific directory it is seperated by `/` like `directory/file`*
 
 ```
-/api/play?infohash="infohash"&file="file1"&file="file2"
+/api/play?infohash="infohash"&file="file1"&file="directory/file2"
 ```
 
 To play a magnet link directly
 
 ```
-/api/playmagnet?magnet="magnetlink"&file="file1"&file="file2"
+/api/playmagnet?magnet="magnetlink"&file="file1"&file="directory/file2"
 ```
 
 To stream all files of torrent
@@ -50,12 +51,13 @@ or
 `/api/addmagnet`
 
 Start a torrent download without opening a stream
+*For specific directory it is seperated by `/` like `directory/file`*
 
 **Request body**
 ```
 {
     Magnet: "magnetlink"
-    Files: ["file1", "file2"] // Download selected file/s. If torrent only has one file it automatically starts the download
+    Files: ["file1", "directory/file2"] // Download selected file/s. If torrent only has one file it automatically starts the download
     AllFiles: false // Set to true to download all files in the torrent
 }
 ```
