@@ -141,39 +141,52 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 }
 
 func removeTorrent(w http.ResponseWriter, r *http.Request) {
-	var rtBodyRes removeTorrentBodyRes
+	var rtBody removeTorrentBody
+	var rtRes removeTorrentRes
 
 	w.Header().Set("Content-Type", "application/json")
-	if json.NewDecoder(r.Body).Decode(&rtBodyRes) != nil {
+	if json.NewDecoder(r.Body).Decode(&rtBody) != nil {
 		httpJSONError(w, "Request JSON body decode error", http.StatusInternalServerError)
 		return
 	}
 
-	if len(rtBodyRes.InfoHash) < 1 {
+	if len(rtBody.InfoHash) < 1 {
 		httpJSONError(w, "No InfoHash provided", http.StatusNotFound)
 		return
 	}
 
-	for i, curih := range rtBodyRes.InfoHash {
+	for i, curih := range rtBody.InfoHash {
+		rtRes.Torrent = append(rtRes.Torrent, removeTorrentResRemoved{})
 		if len(curih) != 40 {
-			rtBodyRes.InfoHash[i] = "INVALIDINFOHASH"
+			rtRes.Torrent[i] = removeTorrentResRemoved{
+				Status: "INVALIDINFOHASH",
+			}
 			continue
 		}
 
 		t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(curih))
 
 		if !tok {
-			rtBodyRes.InfoHash[i] = "TORRENTNOTFOUND"
+			rtRes.Torrent[i] = removeTorrentResRemoved{
+				Status: "TORRENTNOTFOUND",
+			}
 			continue
 		}
 
 		t.Drop()
+		rtRes.Torrent[i] = removeTorrentResRemoved{
+			Name:     t.Name(),
+			InfoHash: t.InfoHash().String(),
+			Status:   "REMOVED",
+		}
 		if os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name())) != nil {
-			rtBodyRes.InfoHash[i] = "FILEREMOVALERROR"
+			rtRes.Torrent[i] = removeTorrentResRemoved{
+				Status: "FILEREMOVALERROR",
+			}
 		}
 	}
 
-	if json.NewEncoder(w).Encode(&rtBodyRes) != nil {
+	if json.NewEncoder(w).Encode(&rtRes) != nil {
 		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
 		return
 	}

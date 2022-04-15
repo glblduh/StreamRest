@@ -22,8 +22,18 @@ type addMagnetFiles struct {
 	FileSizeBytes int
 }
 
-type removeTorrentBodyRes struct {
+type removeTorrentBody struct {
 	InfoHash []string
+}
+
+type removeTorrentRes struct {
+	Torrent []removeTorrentResRemoved
+}
+
+type removeTorrentResRemoved struct {
+	Name     string
+	InfoHash string
+	Status   string
 }
 
 type listTorrentsRes struct {
