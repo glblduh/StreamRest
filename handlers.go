@@ -24,24 +24,20 @@ func httpJSONError(w http.ResponseWriter, error string, code int) {
 }
 
 func addMagnet(w http.ResponseWriter, r *http.Request) {
-	// Variables for JSON request body and response
 	var amBody addMagnetBody
 	var amRes addMagnetRes
 
-	// Decode JSON of request body and set response Content-Type to JSON
 	w.Header().Set("Content-Type", "application/json")
 	if json.NewDecoder(r.Body).Decode(&amBody) != nil {
 		httpJSONError(w, "Request JSON body decode error", http.StatusInternalServerError)
 		return
 	}
 
-	// Response error if parameters are not given
 	if amBody.Magnet == "" {
 		httpJSONError(w, "Magnet link is not provided", http.StatusNotFound)
 		return
 	}
 
-	// Add magnet to torrent client
 	t, magErr := torrentCli.AddMagnet(amBody.Magnet)
 	if magErr != nil {
 		httpJSONError(w, "AddMagnet error", http.StatusInternalServerError)
@@ -55,11 +51,9 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Make response
 	amRes.InfoHash = t.InfoHash().String()
 	amRes.Name = t.Name()
 
-	// If only one file
 	if !t.Info().IsDir() {
 		tFile := t.Files()[0]
 		tFile.Download()
@@ -75,7 +69,6 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If all files are selected
 	if amBody.AllFiles {
 		t.DownloadAll()
 		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
@@ -92,21 +85,19 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If selected files
 	if len(amBody.Files) > 0 {
 		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
 		for _, selFile := range amBody.Files {
-			for _, tFile := range t.Files() {
-				if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(selFile)) {
-					tFile.Download()
-					amRes.PlaylistURL += "&file=" + url.QueryEscape(tFile.DisplayPath())
-					amRes.Files = append(amRes.Files, addMagnetFiles{
-						FileName:      tFile.DisplayPath(),
-						FileSizeBytes: int(tFile.Length()),
-					})
-					break
-				}
+			tFile := getTorrentFile(t.Files(), selFile, false)
+			if tFile == nil {
+				continue
 			}
+			tFile.Download()
+			amRes.PlaylistURL += "&file=" + url.QueryEscape(tFile.DisplayPath())
+			amRes.Files = append(amRes.Files, addMagnetFiles{
+				FileName:      tFile.DisplayPath(),
+				FileSizeBytes: int(tFile.Length()),
+			})
 		}
 		if json.NewEncoder(w).Encode(&amRes) != nil {
 			httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
@@ -118,7 +109,6 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 }
 
 func beginStream(w http.ResponseWriter, r *http.Request) {
-	// Get query values
 	infoHash, ihok := r.URL.Query()["infohash"]
 	fileName, fnok := r.URL.Query()["file"]
 
@@ -127,52 +117,44 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get torrent handler
 	if len(infoHash[0]) != 40 {
 		httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
 		return
 	}
 	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
-	// Torrent not found
 	if !tok {
 		httpJSONError(w, "Torrent not found", http.StatusNotFound)
 		return
 	}
 
-	// Get file from query
-	for _, tFile := range t.Files() {
-		if strings.Compare(tFile.DisplayPath(), fileName[0]) == 0 {
-			w.Header().Set("Content-Disposition", "attachment; filename=\""+safenDisplayPath(tFile.DisplayPath())+"\"")
-			fileRead := tFile.NewReader()
-			defer fileRead.Close()
-			fileRead.SetReadahead(tFile.Length() / 100)
-			http.ServeContent(w, r, tFile.DisplayPath(), time.Now(), fileRead)
-			break
-		}
+	tFile := getTorrentFile(t.Files(), fileName[0], true)
+	if tFile == nil {
+		httpJSONError(w, "File not found", http.StatusNotFound)
+		return
 	}
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+safenDisplayPath(tFile.DisplayPath())+"\"")
+	fileRead := tFile.NewReader()
+	defer fileRead.Close()
+	fileRead.SetReadahead(tFile.Length() / 100)
+	http.ServeContent(w, r, tFile.DisplayPath(), time.Now(), fileRead)
 }
 
 func removeTorrent(w http.ResponseWriter, r *http.Request) {
-	// Vars for request and response
 	var rtBodyRes removeTorrentBodyRes
 
-	// Decode JSON of request body and set response Content-Type to JSON
 	w.Header().Set("Content-Type", "application/json")
 	if json.NewDecoder(r.Body).Decode(&rtBodyRes) != nil {
 		httpJSONError(w, "Request JSON body decode error", http.StatusInternalServerError)
 		return
 	}
 
-	// Response error if parameters are not given
 	if len(rtBodyRes.InfoHash) < 1 {
 		httpJSONError(w, "No InfoHash provided", http.StatusNotFound)
 		return
 	}
 
-	// Get all infohashes provided
 	for i, curih := range rtBodyRes.InfoHash {
-		// If infohash is not 40 characters
 		if len(curih) != 40 {
 			rtBodyRes.InfoHash[i] = "INVALIDINFOHASH"
 			continue
@@ -180,20 +162,17 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 
 		t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(curih))
 
-		// If torrent doesn't exist
 		if !tok {
 			rtBodyRes.InfoHash[i] = "TORRENTNOTFOUND"
 			continue
 		}
 
-		// Removal
 		t.Drop()
 		if os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name())) != nil {
 			rtBodyRes.InfoHash[i] = "FILEREMOVALERROR"
 		}
 	}
 
-	// Send request body as response
 	if json.NewEncoder(w).Encode(&rtBodyRes) != nil {
 		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
 		return
@@ -201,10 +180,8 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 }
 
 func listTorrents(w http.ResponseWriter, r *http.Request) {
-	// Var for JSON response
 	var ltRes listTorrentsRes
 
-	// Get infohash of all of the torrents
 	for _, t := range torrentCli.Torrents() {
 		ltRes.Torrents = append(ltRes.Torrents, listTorrentNameInfoHash{
 			Name:     t.Name(),
@@ -212,7 +189,6 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	//Send response
 	if len(ltRes.Torrents) < 1 {
 		w.WriteHeader(404)
 	}
@@ -225,32 +201,27 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 }
 
 func torrentStats(w http.ResponseWriter, r *http.Request) {
-	// Vars for request body and response
 	infoHash, ihok := r.URL.Query()["infohash"]
 	var tsRes torrentStatsRes
 
 	w.Header().Set("Content-Type", "application/json")
 
-	// Decodes request body to JSON
 	if !ihok {
 		httpJSONError(w, "InfoHash is not provided", http.StatusNotFound)
 		return
 	}
 
-	// Get torrent handler
 	if len(infoHash[0]) != 40 {
 		httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
 		return
 	}
 	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
-	// Not found
 	if !tok {
 		httpJSONError(w, "Torrent is not found", http.StatusNotFound)
 		return
 	}
 
-	// Set corresponding stats
 	tsRes.InfoHash = t.InfoHash().String()
 	tsRes.Name = t.Name()
 	tsRes.TotalPeers = t.Stats().TotalPeers
@@ -258,7 +229,6 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	tsRes.HalfOpenPeers = t.Stats().HalfOpenPeers
 	tsRes.PendingPeers = t.Stats().PendingPeers
 
-	// Get files
 	for _, tFile := range t.Files() {
 		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentStatsFilesOnTorrent{
 			FileName:      tFile.DisplayPath(),
@@ -274,7 +244,6 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Send response
 	if json.NewEncoder(w).Encode(&tsRes) != nil {
 		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
 		return
@@ -282,14 +251,12 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func playMagnet(w http.ResponseWriter, r *http.Request) {
-	// Needed variables
 	infoHash, ihOk := r.URL.Query()["infohash"]
 	magnet, magOk := r.URL.Query()["magnet"]
 	displayName, dnOk := r.URL.Query()["dn"]
 	trackers, trOk := r.URL.Query()["tr"]
 	files, fOk := r.URL.Query()["file"]
 
-	// Check if provided with magnet
 	if !magOk && !ihOk {
 		httpJSONError(w, "Magnet link or InfoHash is not provided", http.StatusNotFound)
 		return
@@ -297,7 +264,6 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	var t *torrent.Torrent
 
-	// If the magnet is escaped
 	if magOk && !dnOk && !trOk && !ihOk {
 		var magErr error
 		t, magErr = torrentCli.AddMagnet(magnet[0])
@@ -307,7 +273,6 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// If infohash is provided
 	if ihOk && !magOk && !dnOk && !trOk {
 		if len(infoHash[0]) != 40 {
 			httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
@@ -317,27 +282,22 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 		var tOk bool
 		t, tOk = torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
-		// If infohash is not found
 		if !tOk {
 			httpJSONError(w, "Torrent is not found", http.StatusNotFound)
 			return
 		}
 	}
 
-	// If the magnet is not escaped
 	if magOk && !ihOk && dnOk || trOk {
 		torrentSpec := torrent.TorrentSpec{}
 
-		// Get infohash from magnet
 		magnetSplit := strings.Split(magnet[0], ":")
 		torrentSpec.InfoHash = metainfo.NewHashFromHex(magnetSplit[len(magnetSplit)-1])
 
-		// Set display name if present
 		if dnOk {
 			torrentSpec.DisplayName = displayName[0]
 		}
 
-		// Set custom trackers if present
 		if trOk {
 			for i, tracker := range trackers {
 				torrentSpec.Trackers = append(torrentSpec.Trackers, []string{})
@@ -345,7 +305,6 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Add torrent spec
 		var atsErr error
 		t, _, atsErr = torrentCli.AddTorrentSpec(&torrentSpec)
 		if atsErr != nil {
@@ -356,17 +315,14 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	<-t.GotInfo()
 
-	// Create playlist file
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+t.InfoHash().String()+".m3u\"")
 	playList := "#EXTM3U\n"
 
-	// Check HTTP scheme if behind reverse proxy
 	httpScheme := "http"
 	if r.Header.Get("X-Forwarded-Proto") != "" {
 		httpScheme = r.Header.Get("X-Forwarded-Proto")
 	}
 
-	// If only one file
 	if !t.Info().IsDir() {
 		tFile := t.Files()[0]
 		tFile.Download()
@@ -375,7 +331,6 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If no files are selected
 	if t.Info().IsDir() && !fOk {
 		t.DownloadAll()
 		for _, tFile := range t.Files() {
@@ -386,13 +341,12 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, file := range files {
-		for _, tFile := range t.Files() {
-			if strings.Contains(strings.ToLower(tFile.DisplayPath()), strings.ToLower(file)) {
-				playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
-				tFile.Download()
-				break
-			}
+		tFile := getTorrentFile(t.Files(), file, false)
+		if tFile == nil {
+			continue
 		}
+		playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
+		tFile.Download()
 	}
 	w.Write([]byte(playList))
 }

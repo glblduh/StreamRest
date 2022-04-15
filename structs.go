@@ -4,8 +4,6 @@ type errorRes struct {
 	Error string
 }
 
-// Add magnet structs
-
 type addMagnetBody struct {
 	Magnet   string
 	AllFiles bool
@@ -24,13 +22,9 @@ type addMagnetFiles struct {
 	FileSizeBytes int
 }
 
-// Remove torrent struct
-
 type removeTorrentBodyRes struct {
 	InfoHash []string
 }
-
-// List torrents structs
 
 type listTorrentsRes struct {
 	Torrents []listTorrentNameInfoHash
@@ -40,8 +34,6 @@ type listTorrentNameInfoHash struct {
 	Name     string
 	InfoHash string
 }
-
-// Torrent stats structs
 
 type torrentStatsRes struct {
 	InfoHash      string
