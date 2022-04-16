@@ -80,7 +80,7 @@ Stops torrent download and deletes its files
 **Request body**
 ```
 {
-    InfoHash: "infohash"
+    InfoHash: ["infohash", "infohash2"]
 }
 ```
 
