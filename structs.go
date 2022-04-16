@@ -19,6 +19,7 @@ type addMagnetRes struct {
 
 type addMagnetFiles struct {
 	FileName      string
+	StreamURL     string
 	FileSizeBytes int
 }
 

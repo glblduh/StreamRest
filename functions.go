@@ -29,3 +29,15 @@ func getTorrentFile(files []*torrent.File, filename string, exactName bool) *tor
 	}
 	return nil
 }
+
+func makePlayStreamURL(infohash string, filename string, isStream bool) string {
+	endPoint := "play"
+	if isStream {
+		endPoint = "stream"
+	}
+	URL := "/api/" + endPoint + "?infohash=" + infohash
+	if filename != "" {
+		URL += "&file=" + url.QueryEscape(filename)
+	}
+	return URL
+}

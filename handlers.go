@@ -57,9 +57,10 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	if !t.Info().IsDir() {
 		tFile := t.Files()[0]
 		tFile.Download()
-		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath())
+		amRes.PlaylistURL = makePlayStreamURL(t.InfoHash().String(), tFile.DisplayPath(), false)
 		amRes.Files = append(amRes.Files, addMagnetFiles{
 			FileName:      tFile.DisplayPath(),
+			StreamURL:     makePlayStreamURL(t.InfoHash().String(), tFile.DisplayPath(), true),
 			FileSizeBytes: int(tFile.Length()),
 		})
 		if json.NewEncoder(w).Encode(&amRes) != nil {
@@ -71,10 +72,11 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 
 	if amBody.AllFiles {
 		t.DownloadAll()
-		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
+		amRes.PlaylistURL = makePlayStreamURL(t.InfoHash().String(), "", false)
 		for _, tFile := range t.Files() {
 			amRes.Files = append(amRes.Files, addMagnetFiles{
 				FileName:      tFile.DisplayPath(),
+				StreamURL:     makePlayStreamURL(t.InfoHash().String(), tFile.DisplayPath(), true),
 				FileSizeBytes: int(tFile.Length()),
 			})
 		}
@@ -86,7 +88,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(amBody.Files) > 0 {
-		amRes.PlaylistURL = "/api/play?infohash=" + t.InfoHash().String()
+		amRes.PlaylistURL = makePlayStreamURL(t.InfoHash().String(), "", false)
 		for _, selFile := range amBody.Files {
 			tFile := getTorrentFile(t.Files(), selFile, false)
 			if tFile == nil {
@@ -96,6 +98,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 			amRes.PlaylistURL += "&file=" + url.QueryEscape(tFile.DisplayPath())
 			amRes.Files = append(amRes.Files, addMagnetFiles{
 				FileName:      tFile.DisplayPath(),
+				StreamURL:     makePlayStreamURL(t.InfoHash().String(), tFile.DisplayPath(), true),
 				FileSizeBytes: int(tFile.Length()),
 			})
 		}
@@ -250,7 +253,7 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 		if tFile.BytesCompleted() != 0 {
 			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
 				FileName:        tFile.DisplayPath(),
-				StreamURL:       "/api/stream?infohash=" + t.InfoHash().String() + "&file=" + url.QueryEscape(tFile.DisplayPath()),
+				StreamURL:       makePlayStreamURL(t.InfoHash().String(), tFile.DisplayPath(), true),
 				BytesDownloaded: int(tFile.BytesCompleted()),
 				FileSizeBytes:   int(tFile.Length()),
 			})
