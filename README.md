@@ -70,7 +70,7 @@ If none of the parameters are given it will respond with the files inside the to
 
 ### Manual stream
 
-**This is not recommended because it doesn't call the download for the file and only supports one file**
+**This only works if the given file is downloading or already downloaded**
 
 ```
 /api/stream?infohash="infohash"&file="filename"
