@@ -20,7 +20,7 @@ func appendFilePlaylist(scheme string, host string, infohash string, name string
 
 func getTorrentFile(files []*torrent.File, filename string, exactName bool) *torrent.File {
 	for _, file := range files {
-		if exactName && strings.Compare(file.DisplayPath(), filename) == 0 {
+		if exactName && file.DisplayPath() == filename {
 			return file
 		}
 		if strings.Contains(strings.ToLower(file.DisplayPath()), strings.ToLower(filename)) {
