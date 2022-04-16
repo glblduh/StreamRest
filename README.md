@@ -53,13 +53,17 @@ or
 
 Start a torrent download without opening a stream
 
+If none of the parameters are given it will respond with the files inside the torrent. Which can be used re-calling the endpoint with the specified filenames.
+
 *For specific directory it is seperated by `/` like `directory/file`*
 
 **Request body**
 ```
 {
     Magnet: "magnetlink"
-    Files: ["file1", "directory/file2"] // Download selected file/s. If torrent only has one file it automatically starts the download
+
+    // Parameters
+    Files: ["file1", "directory/file2"] // Download selected file/s.
     AllFiles: false // Set to true to download all files in the torrent
 }
 ```

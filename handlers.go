@@ -45,30 +45,8 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	}
 	<-t.GotInfo()
 
-	if t.Info().IsDir() && !amBody.AllFiles && len(amBody.Files) < 1 {
-		t.Drop()
-		httpJSONError(w, "No file/s provided", http.StatusNotFound)
-		return
-	}
-
 	amRes.InfoHash = t.InfoHash().String()
 	amRes.Name = t.Name()
-
-	if !t.Info().IsDir() {
-		tFile := t.Files()[0]
-		tFile.Download()
-		amRes.PlaylistURL = makePlayStreamURL(t.InfoHash().String(), tFile.DisplayPath(), false)
-		amRes.Files = append(amRes.Files, addMagnetFiles{
-			FileName:      tFile.DisplayPath(),
-			StreamURL:     makePlayStreamURL(t.InfoHash().String(), tFile.DisplayPath(), true),
-			FileSizeBytes: int(tFile.Length()),
-		})
-		if json.NewEncoder(w).Encode(&amRes) != nil {
-			httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
-			return
-		}
-		return
-	}
 
 	if amBody.AllFiles {
 		t.DownloadAll()
@@ -109,6 +87,16 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, tFile := range t.Files() {
+		amRes.Files = append(amRes.Files, addMagnetFiles{
+			FileName:      tFile.DisplayPath(),
+			FileSizeBytes: int(tFile.Length()),
+		})
+	}
+	if json.NewEncoder(w).Encode(&amRes) != nil {
+		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func beginStream(w http.ResponseWriter, r *http.Request) {
