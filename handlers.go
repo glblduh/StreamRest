@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/anacrolix/torrent"
@@ -25,7 +24,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t, magErr := torrentCli.AddMagnet(amBody.Magnet)
+	t, magErr := initMagnet(amBody.Magnet, []string{}, []string{})
 	if magErr != nil {
 		httpJSONError(w, "AddMagnet error", http.StatusInternalServerError)
 		return
@@ -220,8 +219,8 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 func playMagnet(w http.ResponseWriter, r *http.Request) {
 	infoHash, ihOk := r.URL.Query()["infohash"]
 	magnet, magOk := r.URL.Query()["magnet"]
-	displayName, dnOk := r.URL.Query()["dn"]
-	trackers, trOk := r.URL.Query()["tr"]
+	displayName, _ := r.URL.Query()["dn"]
+	trackers, _ := r.URL.Query()["tr"]
 	files, fOk := r.URL.Query()["file"]
 
 	if !magOk && !ihOk {
@@ -230,56 +229,23 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var t *torrent.Torrent
-
-	if magOk && !dnOk && !trOk && !ihOk {
-		var magErr error
-		t, magErr = torrentCli.AddMagnet(magnet[0])
-		if magErr != nil {
-			httpJSONError(w, "AddMagnet error", http.StatusInternalServerError)
+	if magOk && !ihOk {
+		var err error
+		t, err = initMagnet(magnet[0], displayName, trackers)
+		if err != nil {
+			httpJSONError(w, "Torrent add error", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	if ihOk && !magOk && !dnOk && !trOk {
-		if len(infoHash[0]) != 40 {
-			httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
-			return
-		}
-
+	if ihOk && !magOk {
 		var tOk bool
 		t, tOk = torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
-
 		if !tOk {
-			httpJSONError(w, "Torrent is not found", http.StatusNotFound)
+			httpJSONError(w, "Torrent not found", http.StatusInternalServerError)
 			return
 		}
 	}
-
-	if magOk && !ihOk && dnOk || trOk {
-		torrentSpec := torrent.TorrentSpec{}
-
-		magnetSplit := strings.Split(magnet[0], ":")
-		torrentSpec.InfoHash = metainfo.NewHashFromHex(magnetSplit[len(magnetSplit)-1])
-
-		if dnOk {
-			torrentSpec.DisplayName = displayName[0]
-		}
-
-		if trOk {
-			for i, tracker := range trackers {
-				torrentSpec.Trackers = append(torrentSpec.Trackers, []string{})
-				torrentSpec.Trackers[i] = append(torrentSpec.Trackers[i], tracker)
-			}
-		}
-
-		var atsErr error
-		t, _, atsErr = torrentCli.AddTorrentSpec(&torrentSpec)
-		if atsErr != nil {
-			httpJSONError(w, "AddTorrentSpec error", http.StatusInternalServerError)
-			return
-		}
-	}
-
 	<-t.GotInfo()
 
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+t.InfoHash().String()+".m3u\"")

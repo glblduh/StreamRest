@@ -70,3 +70,15 @@ func makeJSONResponse(w http.ResponseWriter, v any) {
 		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
 	}
 }
+
+func initMagnet(magnet string, alldn []string, alltr []string) (*torrent.Torrent, error) {
+	magnetString := magnet
+	for _, dn := range alldn {
+		magnetString += "&dn=" + url.QueryEscape(dn)
+	}
+	for _, tr := range alltr {
+		magnetString += "&tr=" + url.QueryEscape(tr)
+	}
+	t, err := torrentCli.AddMagnet(magnetString)
+	return t, err
+}
