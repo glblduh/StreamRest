@@ -102,7 +102,6 @@ func beginStream(w http.ResponseWriter, r *http.Request) {
 		httpJSONError(w, "File not found", http.StatusNotFound)
 		return
 	}
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+safenDisplayPath(tFile.DisplayPath())+"\"")
 	fileRead := tFile.NewReader()
 	defer fileRead.Close()
 	fileRead.SetReadahead(tFile.Length() / 100)
