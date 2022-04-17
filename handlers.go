@@ -284,38 +284,27 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+t.InfoHash().String()+".m3u\"")
 	playList := "#EXTM3U\n"
-	plCompleted := false
 
 	httpScheme := "http"
 	if r.Header.Get("X-Forwarded-Proto") != "" {
 		httpScheme = r.Header.Get("X-Forwarded-Proto")
 	}
 
-	if !plCompleted && !t.Info().IsDir() {
-		tFile := t.Files()[0]
-		tFile.Download()
-		playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
-		plCompleted = true
-	}
-
-	if !plCompleted && t.Info().IsDir() && !fOk {
+	if !fOk {
 		t.DownloadAll()
 		for _, tFile := range t.Files() {
 			playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
 		}
-		plCompleted = true
 	}
 
-	if !plCompleted {
-		for _, file := range files {
-			tFile := getTorrentFile(t.Files(), file, false)
-			if tFile == nil {
-				continue
-			}
-			playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
-			tFile.Download()
+	for _, file := range files {
+		tFile := getTorrentFile(t.Files(), file, false)
+		if tFile == nil {
+			continue
 		}
-		plCompleted = true
+		playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
+		tFile.Download()
 	}
+
 	w.Write([]byte(playList))
 }
