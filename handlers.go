@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,23 +12,11 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 )
 
-func httpJSONError(w http.ResponseWriter, error string, code int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	if json.NewEncoder(w).Encode(errorRes{
-		Error: error,
-	}) != nil {
-		http.Error(w, error, code)
-	}
-}
-
 func addMagnet(w http.ResponseWriter, r *http.Request) {
 	var amBody addMagnetBody
 	var amRes addMagnetRes
 
-	w.Header().Set("Content-Type", "application/json")
-	if json.NewDecoder(r.Body).Decode(&amBody) != nil {
-		httpJSONError(w, "Request JSON body decode error", http.StatusInternalServerError)
+	if parseRequestBody(w, r, &amBody) != nil {
 		return
 	}
 
@@ -58,10 +45,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 				FileSizeBytes: int(tFile.Length()),
 			})
 		}
-		if json.NewEncoder(w).Encode(&amRes) != nil {
-			httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
-			return
-		}
+		makeJSONResponse(w, &amRes)
 		return
 	}
 
@@ -80,10 +64,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 				FileSizeBytes: int(tFile.Length()),
 			})
 		}
-		if json.NewEncoder(w).Encode(&amRes) != nil {
-			httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
-			return
-		}
+		makeJSONResponse(w, &amRes)
 		return
 	}
 
@@ -93,10 +74,7 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 			FileSizeBytes: int(tFile.Length()),
 		})
 	}
-	if json.NewEncoder(w).Encode(&amRes) != nil {
-		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
-		return
-	}
+	makeJSONResponse(w, &amRes)
 }
 
 func beginStream(w http.ResponseWriter, r *http.Request) {
@@ -135,9 +113,7 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	var rtBody removeTorrentBody
 	var rtRes removeTorrentRes
 
-	w.Header().Set("Content-Type", "application/json")
-	if json.NewDecoder(r.Body).Decode(&rtBody) != nil {
-		httpJSONError(w, "Request JSON body decode error", http.StatusInternalServerError)
+	if parseRequestBody(w, r, &rtBody) != nil {
 		return
 	}
 
@@ -177,10 +153,7 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if json.NewEncoder(w).Encode(&rtRes) != nil {
-		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
-		return
-	}
+	makeJSONResponse(w, &rtRes)
 }
 
 func listTorrents(w http.ResponseWriter, r *http.Request) {
@@ -197,18 +170,12 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if json.NewEncoder(w).Encode(&ltRes) != nil {
-		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
-		return
-	}
+	makeJSONResponse(w, &ltRes)
 }
 
 func torrentStats(w http.ResponseWriter, r *http.Request) {
 	infoHash, ihok := r.URL.Query()["infohash"]
 	var tsRes torrentStatsRes
-
-	w.Header().Set("Content-Type", "application/json")
 
 	if !ihok {
 		httpJSONError(w, "InfoHash is not provided", http.StatusNotFound)
@@ -248,10 +215,7 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if json.NewEncoder(w).Encode(&tsRes) != nil {
-		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
-		return
-	}
+	makeJSONResponse(w, &tsRes)
 }
 
 func playMagnet(w http.ResponseWriter, r *http.Request) {
@@ -321,36 +285,38 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+t.InfoHash().String()+".m3u\"")
 	playList := "#EXTM3U\n"
+	plCompleted := false
 
 	httpScheme := "http"
 	if r.Header.Get("X-Forwarded-Proto") != "" {
 		httpScheme = r.Header.Get("X-Forwarded-Proto")
 	}
 
-	if !t.Info().IsDir() {
+	if !plCompleted && !t.Info().IsDir() {
 		tFile := t.Files()[0]
 		tFile.Download()
 		playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
-		w.Write([]byte(playList))
-		return
+		plCompleted = true
 	}
 
-	if t.Info().IsDir() && !fOk {
+	if !plCompleted && t.Info().IsDir() && !fOk {
 		t.DownloadAll()
 		for _, tFile := range t.Files() {
 			playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
 		}
-		w.Write([]byte(playList))
-		return
+		plCompleted = true
 	}
 
-	for _, file := range files {
-		tFile := getTorrentFile(t.Files(), file, false)
-		if tFile == nil {
-			continue
+	if !plCompleted {
+		for _, file := range files {
+			tFile := getTorrentFile(t.Files(), file, false)
+			if tFile == nil {
+				continue
+			}
+			playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
+			tFile.Download()
 		}
-		playList += appendFilePlaylist(httpScheme, r.Host, t.InfoHash().String(), tFile.DisplayPath())
-		tFile.Download()
+		plCompleted = true
 	}
 	w.Write([]byte(playList))
 }

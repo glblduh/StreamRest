@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -19,15 +21,16 @@ func appendFilePlaylist(scheme string, host string, infohash string, name string
 }
 
 func getTorrentFile(files []*torrent.File, filename string, exactName bool) *torrent.File {
+	var tFile *torrent.File = nil
 	for _, file := range files {
 		if exactName && file.DisplayPath() == filename {
-			return file
+			tFile = file
 		}
 		if strings.Contains(strings.ToLower(file.DisplayPath()), strings.ToLower(filename)) {
-			return file
+			tFile = file
 		}
 	}
-	return nil
+	return tFile
 }
 
 func makePlayStreamURL(infohash string, filename string, isStream bool) string {
@@ -40,4 +43,30 @@ func makePlayStreamURL(infohash string, filename string, isStream bool) string {
 		URL += "&file=" + url.QueryEscape(filename)
 	}
 	return URL
+}
+
+func httpJSONError(w http.ResponseWriter, error string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	if json.NewEncoder(w).Encode(errorRes{
+		Error: error,
+	}) != nil {
+		http.Error(w, error, code)
+	}
+}
+
+func parseRequestBody(w http.ResponseWriter, r *http.Request, v any) error {
+	err := json.NewDecoder(r.Body).Decode(v)
+	if err != nil {
+		httpJSONError(w, "Request JSON body decode error", http.StatusInternalServerError)
+	}
+	return err
+}
+
+func makeJSONResponse(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(v)
+	if err != nil {
+		httpJSONError(w, "Response JSON body encode error", http.StatusInternalServerError)
+	}
 }
