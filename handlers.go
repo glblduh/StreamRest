@@ -121,9 +121,9 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i, curih := range rtBody.InfoHash {
-		rtRes.Torrent = append(rtRes.Torrent, removeTorrentResRemoved{})
+		rtRes.Torrents = append(rtRes.Torrents, removeTorrentResRemoved{})
 		if len(curih) != 40 {
-			rtRes.Torrent[i] = removeTorrentResRemoved{
+			rtRes.Torrents[i] = removeTorrentResRemoved{
 				Status: "INVALIDINFOHASH",
 			}
 			continue
@@ -132,20 +132,20 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 		t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(curih))
 
 		if !tok {
-			rtRes.Torrent[i] = removeTorrentResRemoved{
+			rtRes.Torrents[i] = removeTorrentResRemoved{
 				Status: "TORRENTNOTFOUND",
 			}
 			continue
 		}
 
 		t.Drop()
-		rtRes.Torrent[i] = removeTorrentResRemoved{
+		rtRes.Torrents[i] = removeTorrentResRemoved{
 			Name:     t.Name(),
 			InfoHash: t.InfoHash().String(),
 			Status:   "REMOVED",
 		}
 		if os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name())) != nil {
-			rtRes.Torrent[i] = removeTorrentResRemoved{
+			rtRes.Torrents[i] = removeTorrentResRemoved{
 				Status: "FILEREMOVALERROR",
 			}
 		}

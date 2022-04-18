@@ -28,7 +28,7 @@ type removeTorrentBody struct {
 }
 
 type removeTorrentRes struct {
-	Torrent []removeTorrentResRemoved
+	Torrents []removeTorrentResRemoved
 }
 
 type removeTorrentResRemoved struct {
