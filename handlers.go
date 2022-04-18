@@ -116,7 +116,7 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(rtBody.InfoHash) < 1 {
-		httpJSONError(w, "No InfoHash provided", http.StatusNotFound)
+		httpJSONError(w, "InfoHash is not provided", http.StatusNotFound)
 		return
 	}
 
@@ -187,7 +187,7 @@ func torrentStats(w http.ResponseWriter, r *http.Request) {
 	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
 
 	if !tok {
-		httpJSONError(w, "Torrent is not found", http.StatusNotFound)
+		httpJSONError(w, "Torrent not found", http.StatusNotFound)
 		return
 	}
 
