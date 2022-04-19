@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
 )
 
 func safenDisplayPath(displayPath string) string {
@@ -71,7 +72,9 @@ func makeJSONResponse(w http.ResponseWriter, v any) {
 	}
 }
 
-func initMagnet(magnet string, alldn []string, alltr []string) (*torrent.Torrent, error) {
+func initMagnet(w http.ResponseWriter, magnet string, alldn []string, alltr []string) *torrent.Torrent {
+	var t *torrent.Torrent = nil
+	var err error
 	magnetString := magnet
 	for _, dn := range alldn {
 		magnetString += "&dn=" + url.QueryEscape(dn)
@@ -79,6 +82,23 @@ func initMagnet(magnet string, alldn []string, alltr []string) (*torrent.Torrent
 	for _, tr := range alltr {
 		magnetString += "&tr=" + url.QueryEscape(tr)
 	}
-	t, err := torrentCli.AddMagnet(magnetString)
-	return t, err
+	t, err = torrentCli.AddMagnet(magnetString)
+	if err != nil {
+		httpJSONError(w, "Torrent add error", http.StatusInternalServerError)
+	}
+	return t
+}
+
+func getTorrent(w http.ResponseWriter, infoHash string) *torrent.Torrent {
+	var t *torrent.Torrent = nil
+	var tOk bool
+	if len(infoHash) != 40 {
+		httpJSONError(w, "InfoHash not valid", http.StatusInternalServerError)
+		return t
+	}
+	t, tOk = torrentCli.Torrent(metainfo.NewHashFromHex(infoHash))
+	if !tOk {
+		httpJSONError(w, "Torrent not found", http.StatusNotFound)
+	}
+	return t
 }

@@ -24,9 +24,8 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t, magErr := initMagnet(amBody.Magnet, []string{}, []string{})
-	if magErr != nil {
-		httpJSONError(w, "AddMagnet error", http.StatusInternalServerError)
+	t := initMagnet(w, amBody.Magnet, []string{}, []string{})
+	if t == nil {
 		return
 	}
 	<-t.GotInfo()
@@ -77,22 +76,16 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 }
 
 func beginStream(w http.ResponseWriter, r *http.Request) {
-	infoHash, ihok := r.URL.Query()["infohash"]
-	fileName, fnok := r.URL.Query()["file"]
+	infoHash, ihOk := r.URL.Query()["infohash"]
+	fileName, fnOk := r.URL.Query()["file"]
 
-	if !ihok || !fnok {
+	if !ihOk || !fnOk {
 		httpJSONError(w, "InfoHash or File is not provided", http.StatusNotFound)
 		return
 	}
 
-	if len(infoHash[0]) != 40 {
-		httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
-		return
-	}
-	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
-
-	if !tok {
-		httpJSONError(w, "Torrent not found", http.StatusNotFound)
+	t := getTorrent(w, infoHash[0])
+	if t == nil {
 		return
 	}
 
@@ -172,22 +165,16 @@ func listTorrents(w http.ResponseWriter, r *http.Request) {
 }
 
 func torrentStats(w http.ResponseWriter, r *http.Request) {
-	infoHash, ihok := r.URL.Query()["infohash"]
+	infoHash, ihOk := r.URL.Query()["infohash"]
 	var tsRes torrentStatsRes
 
-	if !ihok {
+	if !ihOk {
 		httpJSONError(w, "InfoHash is not provided", http.StatusNotFound)
 		return
 	}
 
-	if len(infoHash[0]) != 40 {
-		httpJSONError(w, "InfoHash is not valid", http.StatusInternalServerError)
-		return
-	}
-	t, tok := torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
-
-	if !tok {
-		httpJSONError(w, "Torrent not found", http.StatusNotFound)
+	t := getTorrent(w, infoHash[0])
+	if t == nil {
 		return
 	}
 
@@ -230,22 +217,17 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 
 	var t *torrent.Torrent
 	if magOk && !ihOk {
-		var err error
-		t, err = initMagnet(magnet[0], displayName, trackers)
-		if err != nil {
-			httpJSONError(w, "Torrent add error", http.StatusInternalServerError)
-			return
-		}
+		t = initMagnet(w, magnet[0], displayName, trackers)
 	}
 
 	if ihOk && !magOk {
-		var tOk bool
-		t, tOk = torrentCli.Torrent(metainfo.NewHashFromHex(infoHash[0]))
-		if !tOk {
-			httpJSONError(w, "Torrent not found", http.StatusInternalServerError)
-			return
-		}
+		t = getTorrent(w, infoHash[0])
 	}
+
+	if t == nil {
+		return
+	}
+
 	<-t.GotInfo()
 
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+t.InfoHash().String()+".m3u\"")
