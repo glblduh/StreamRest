@@ -16,7 +16,7 @@ go build -ldflags="-extldflags -static -w -s" -tags=nosqlite
 ```
 
 ## Starting
-`streamrest [-l PORT] [-d DOWNLOADDIR] [--noup]`
+`streamrest [-port PORT] [-dir DOWNLOADDIR] [-noup]`
 
 ## Endpoints
 

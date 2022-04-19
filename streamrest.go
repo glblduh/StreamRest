@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -32,54 +33,30 @@ func main() {
 		os.Exit(0)
 	}()
 
-	httpHost := ":1010"
-	dataDir := ""
-	disableUpload := false
+	dirPath := flag.String("dir", "srdir", "Set the download directory")
+	httpHost := flag.String("port", ":1010", "Set the listening port")
+	noUp := flag.Bool("noup", false, "Disable uploads")
+	flag.Parse()
+
+	tcliConfs = torrent.NewDefaultClientConfig()
+	tcliConfs.DataDir = filepath.Clean(*dirPath)
+	tcliConfs.NoUpload = *noUp
+
+	log.Printf("[INFO] Download directory is set to: %s\n", tcliConfs.DataDir)
 
 	_, isnoUp := os.LookupEnv("NOUP")
 	if isnoUp {
-		disableUpload = true
-	}
-
-	progArgs := os.Args[1:]
-	for i := 0; i < len(progArgs); i++ {
-		if progArgs[i] == "-l" {
-			httpHost = progArgs[i+1]
-		}
-		if progArgs[i] == "-d" {
-			dataDir = progArgs[i+1]
-		}
-		if progArgs[i] == "--noup" {
-			disableUpload = true
-		}
-	}
-
-	tcliConfs = torrent.NewDefaultClientConfig()
-
-	if dataDir == "" {
-		pwd, pwdErr := os.Getwd()
-		if pwdErr != nil {
-			log.Fatalf("[ERROR] Cannot get working directory: %s\n", pwdErr)
-		}
-		mkaErr := os.MkdirAll(filepath.Join(pwd, "srdir"), os.ModePerm)
-		if mkaErr != nil {
-			log.Fatalf("[ERROR] Creation of download directory failed: %s\n", mkaErr)
-		}
-		tcliConfs.DataDir = filepath.Join(pwd, "srdir")
-	} else {
-		tcliConfs.DataDir = filepath.Join(dataDir)
-	}
-	log.Printf("[INFO] Download directory is set to: %s\n", tcliConfs.DataDir)
-
-	if disableUpload {
-		log.Println("[INFO] Upload is disabled")
 		tcliConfs.NoUpload = true
+	}
+
+	if tcliConfs.NoUpload {
+		log.Println("[INFO] Upload is disabled")
 	}
 
 	var tCliErr error
 	torrentCli, tCliErr = torrent.NewClient(tcliConfs)
 	if tCliErr != nil {
-		log.Fatalf("[ERROR] Creation of TorrentClient failed: %s\n", tCliErr)
+		log.Fatalf("[ERROR] Creation of BitTorrent client failed: %s\n", tCliErr)
 	}
 
 	mux := http.NewServeMux()
@@ -96,6 +73,6 @@ func main() {
 		AllowCredentials: true,
 	})
 
-	log.Printf("[INFO] Listening on http://%s\n", httpHost)
-	log.Fatalln(http.ListenAndServe(httpHost, c.Handler(mux)))
+	log.Printf("[INFO] Listening on http://%s\n", *httpHost)
+	log.Fatalln(http.ListenAndServe(*httpHost, c.Handler(mux)))
 }
