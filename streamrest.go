@@ -17,22 +17,6 @@ var torrentCli *torrent.Client
 var tcliConfs *torrent.ClientConfig
 
 func main() {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		log.Println("[INFO] Termination detected. Removing torrents")
-		for _, t := range torrentCli.Torrents() {
-			log.Printf("[INFO] Removing torrent: [%s]\n", t.Name())
-			t.Drop()
-			rmaErr := os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name()))
-			if rmaErr != nil {
-				log.Printf("[ERROR] Failed to remove files of torrent: [%s]: %s\n", t.Name(), rmaErr)
-			}
-		}
-		os.Exit(0)
-	}()
-
 	dirPath := flag.String("dir", "srdir", "Set the download directory")
 	httpHost := flag.String("port", ":1010", "Set the listening port")
 	noUp := flag.Bool("noup", false, "Disable uploads")
@@ -58,6 +42,22 @@ func main() {
 	if tCliErr != nil {
 		log.Fatalf("[ERROR] Creation of BitTorrent client failed: %s\n", tCliErr)
 	}
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		log.Println("[INFO] Termination detected. Removing torrents")
+		for _, t := range torrentCli.Torrents() {
+			log.Printf("[INFO] Removing torrent: [%s]\n", t.Name())
+			t.Drop()
+			rmaErr := os.RemoveAll(filepath.Join(tcliConfs.DataDir, t.Name()))
+			if rmaErr != nil {
+				log.Printf("[ERROR] Failed to remove files of torrent: [%s]: %s\n", t.Name(), rmaErr)
+			}
+		}
+		os.Exit(0)
+	}()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/addmagnet", addMagnet)
