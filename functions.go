@@ -72,6 +72,12 @@ func makeJSONResponse(w http.ResponseWriter, v any) {
 	}
 }
 
+func getInfo(t *torrent.Torrent) {
+	if t != nil {
+		<-t.GotInfo()
+	}
+}
+
 func initMagnet(w http.ResponseWriter, magnet string, alldn []string, alltr []string) *torrent.Torrent {
 	var t *torrent.Torrent = nil
 	var err error
@@ -86,6 +92,7 @@ func initMagnet(w http.ResponseWriter, magnet string, alldn []string, alltr []st
 	if err != nil {
 		httpJSONError(w, "Torrent add error", http.StatusInternalServerError)
 	}
+	getInfo(t)
 	return t
 }
 
@@ -100,5 +107,6 @@ func getTorrent(w http.ResponseWriter, infoHash string) *torrent.Torrent {
 	if !tOk {
 		httpJSONError(w, "Torrent not found", http.StatusNotFound)
 	}
+	getInfo(t)
 	return t
 }

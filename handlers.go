@@ -28,7 +28,6 @@ func addMagnet(w http.ResponseWriter, r *http.Request) {
 	if t == nil {
 		return
 	}
-	<-t.GotInfo()
 
 	amRes.InfoHash = t.InfoHash().String()
 	amRes.Name = t.Name()
@@ -227,8 +226,6 @@ func playMagnet(w http.ResponseWriter, r *http.Request) {
 	if t == nil {
 		return
 	}
-
-	<-t.GotInfo()
 
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+t.InfoHash().String()+".m3u\"")
 	playList := "#EXTM3U\n"
