@@ -38,12 +38,7 @@ type removeTorrentResRemoved struct {
 }
 
 type listTorrentsRes struct {
-	Torrents []listTorrentNameInfoHash
-}
-
-type listTorrentNameInfoHash struct {
-	Name     string
-	InfoHash string
+	Torrents []torrentStatsRes
 }
 
 type torrentStatsRes struct {

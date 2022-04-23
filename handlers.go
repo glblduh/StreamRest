@@ -147,59 +147,29 @@ func removeTorrent(w http.ResponseWriter, r *http.Request) {
 }
 
 func listTorrents(w http.ResponseWriter, r *http.Request) {
+	infoHash, ihOk := r.URL.Query()["infohash"]
 	var ltRes listTorrentsRes
 
-	for _, t := range torrentCli.Torrents() {
-		ltRes.Torrents = append(ltRes.Torrents, listTorrentNameInfoHash{
-			Name:     t.Name(),
-			InfoHash: t.InfoHash().String(),
-		})
+	allTorrents := torrentCli.Torrents()
+
+	if ihOk {
+		allTorrents = nil
+		t := getTorrent(w, infoHash[0])
+		if t == nil {
+			return
+		}
+		allTorrents = append(allTorrents, t)
 	}
 
-	if len(ltRes.Torrents) < 1 {
+	for _, t := range allTorrents {
+		ltRes.Torrents = append(ltRes.Torrents, parseTorrentStats(t))
+	}
+
+	if !ihOk && len(ltRes.Torrents) < 1 {
 		w.WriteHeader(404)
 	}
 
 	makeJSONResponse(w, &ltRes)
-}
-
-func torrentStats(w http.ResponseWriter, r *http.Request) {
-	infoHash, ihOk := r.URL.Query()["infohash"]
-	var tsRes torrentStatsRes
-
-	if !ihOk {
-		httpJSONError(w, "InfoHash is not provided", http.StatusNotFound)
-		return
-	}
-
-	t := getTorrent(w, infoHash[0])
-	if t == nil {
-		return
-	}
-
-	tsRes.InfoHash = t.InfoHash().String()
-	tsRes.Name = t.Name()
-	tsRes.TotalPeers = t.Stats().TotalPeers
-	tsRes.ActivePeers = t.Stats().ActivePeers
-	tsRes.HalfOpenPeers = t.Stats().HalfOpenPeers
-	tsRes.PendingPeers = t.Stats().PendingPeers
-
-	for _, tFile := range t.Files() {
-		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentStatsFilesOnTorrent{
-			FileName:      tFile.DisplayPath(),
-			FileSizeBytes: int(tFile.Length()),
-		})
-		if tFile.BytesCompleted() != 0 {
-			tsRes.Files.OnDisk = append(tsRes.Files.OnDisk, torrentStatsFilesOnDisk{
-				FileName:        tFile.DisplayPath(),
-				StreamURL:       makePlayStreamURL(t.InfoHash().String(), tFile.DisplayPath(), true),
-				BytesDownloaded: int(tFile.BytesCompleted()),
-				FileSizeBytes:   int(tFile.Length()),
-			})
-		}
-	}
-
-	makeJSONResponse(w, &tsRes)
 }
 
 func playMagnet(w http.ResponseWriter, r *http.Request) {

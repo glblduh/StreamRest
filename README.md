@@ -93,11 +93,8 @@ Stops torrent download and deletes its files
 
 A array of infohash of all active torrents
 
-### Get Torrent info
-`/api/torrent`
-
-Get info about the torrent
+**To get the info of a specific torrent**
 
 ```
-/api/torrent?infohash="infohash"
+/api/torrents?infohash="infohash"
 ```
