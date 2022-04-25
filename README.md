@@ -35,7 +35,7 @@ Automatically create a playlist file for the selected files
 To play a magnet link directly
 
 ```
-/api/playmagnet?magnet="magnetlink"&file="file1"&file="directory/file2"
+/api/play?magnet="magnetlink"&file="file1"&file="directory/file2"
 ```
 
 To stream all files of torrent
