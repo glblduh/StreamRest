@@ -27,8 +27,11 @@ func getTorrentFile(files []*torrent.File, filename string, exactName bool) *tor
 		if exactName && file.DisplayPath() == filename {
 			tFile = file
 		}
-		if strings.Contains(strings.ToLower(file.DisplayPath()), strings.ToLower(filename)) {
+		if !exactName && filename != "" && strings.Contains(strings.ToLower(file.DisplayPath()), strings.ToLower(filename)) {
 			tFile = file
+		}
+		if tFile != nil {
+			break
 		}
 	}
 	return tFile
@@ -114,6 +117,7 @@ func getTorrent(w http.ResponseWriter, infoHash string) *torrent.Torrent {
 func parseTorrentStats(t *torrent.Torrent) torrentStatsRes {
 	var tsRes torrentStatsRes
 
+	getInfo(t)
 	tsRes.InfoHash = t.InfoHash().String()
 	tsRes.Name = t.Name()
 	tsRes.TotalPeers = t.Stats().TotalPeers
