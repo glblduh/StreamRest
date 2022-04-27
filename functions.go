@@ -21,13 +21,23 @@ func appendFilePlaylist(scheme string, host string, infohash string, name string
 	return playList
 }
 
+func nameCheck(str string, substr string) bool {
+	splittedSubStr := strings.Split(substr, " ")
+	for _, curWord := range splittedSubStr {
+		if !strings.Contains(str, curWord) {
+			return false
+		}
+	}
+	return true
+}
+
 func getTorrentFile(files []*torrent.File, filename string, exactName bool) *torrent.File {
 	var tFile *torrent.File = nil
 	for _, file := range files {
 		if exactName && file.DisplayPath() == filename {
 			tFile = file
 		}
-		if !exactName && filename != "" && strings.Contains(strings.ToLower(file.DisplayPath()), strings.ToLower(filename)) {
+		if !exactName && filename != "" && nameCheck(strings.ToLower(file.DisplayPath()), strings.ToLower(filename)) {
 			tFile = file
 		}
 		if tFile != nil {
