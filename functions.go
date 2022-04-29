@@ -127,13 +127,16 @@ func getTorrent(w http.ResponseWriter, infoHash string) *torrent.Torrent {
 func parseTorrentStats(t *torrent.Torrent) torrentStatsRes {
 	var tsRes torrentStatsRes
 
-	getInfo(t)
 	tsRes.InfoHash = t.InfoHash().String()
 	tsRes.Name = t.Name()
 	tsRes.TotalPeers = t.Stats().TotalPeers
 	tsRes.ActivePeers = t.Stats().ActivePeers
 	tsRes.HalfOpenPeers = t.Stats().HalfOpenPeers
 	tsRes.PendingPeers = t.Stats().PendingPeers
+
+	if t.Info() == nil {
+		return tsRes
+	}
 
 	for _, tFile := range t.Files() {
 		tsRes.Files.OnTorrent = append(tsRes.Files.OnTorrent, torrentStatsFilesOnTorrent{
